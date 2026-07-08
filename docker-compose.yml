@@ -1,0 +1,69 @@
+x-app-environment: &app-environment
+  DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/workspace_orchestrator
+  REDIS_URL: redis://redis:6379/0
+  SECRET_KEY: ${SECRET_KEY:-dev-change-me}
+  EMBED_MODE: ${EMBED_MODE:-fake}
+  GEMINI_STUDIO_API_KEY: ${GEMINI_STUDIO_API_KEY:-}
+  INFERENCE_BASE_URL: ${INFERENCE_BASE_URL:-https://generativelanguage.googleapis.com/v1beta/openai/}
+  CHAT_MODEL: ${CHAT_MODEL:-gemini-2.5-flash}
+  EMBED_MODEL: ${EMBED_MODEL:-gemini-embedding-001}
+
+x-app-base: &app-base
+  image: python:3.12-slim
+  working_dir: /app
+  init: true
+  environment: *app-environment
+  volumes:
+    - .:/app
+    - app-venv:/app/.venv
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: workspace_orchestrator
+    ports:
+      - "${POSTGRES_HOST_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d workspace_orchestrator"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--maxmemory-policy", "noeviction"]
+    ports:
+      - "${REDIS_HOST_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    <<: *app-base
+    command: sh -c "pip install --no-cache-dir uv && uv sync && uv run uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload"
+    ports:
+      - "${API_HOST_PORT:-8000}:8000"
+
+  worker:
+    <<: *app-base
+    command: sh -c "pip install --no-cache-dir uv && uv sync && uv run celery -A backend.workers.celery_app worker --pool=prefork --concurrency=2 --loglevel=info"
+
+  beat:
+    <<: *app-base
+    command: sh -c "pip install --no-cache-dir uv && uv sync && uv run celery -A backend.workers.celery_app beat --loglevel=info"
+
+volumes:
+  pgdata:
+  app-venv:
