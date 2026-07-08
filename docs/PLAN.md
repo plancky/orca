@@ -9,9 +9,16 @@ synthesizes a natural-language answer. Rubric weights **orchestration logic, emb
 design** — not Google API plumbing. Restrictions: **no LangChain/LlamaIndex/agent frameworks, no managed
 vector DBs** — everything from scratch on FastAPI + Postgres/pgvector + Redis + Celery. Time budget 6–8h.
 
-**Deviation from the sample stack:** inference is **self-hosted and OpenAI-compatible** — one client points
-at `INFERENCE_BASE_URL` for both `/v1/chat/completions` and `/v1/embeddings`. Embedding model is BGE/GTE-large
-(**1024 dims**, so the schema is `vector(1024)`, not the sample's 1536).
+**Deviation from the sample stack:** inference + embeddings are **Google Gemini (AI Studio) via its
+OpenAI-compatibility layer** — one async httpx client points at `INFERENCE_BASE_URL`
+(`https://generativelanguage.googleapis.com/v1beta/openai/`) for both `chat/completions` and `embeddings`,
+authed by `Authorization: Bearer ${GEMINI_STUDIO_API_KEY}`, operated under **free-tier** limits (throttle +
+`429` backoff; the query-embedding cache is load-bearing for quota). Chat = `gemini-2.5-flash`
+(env-overridable); embeddings = `gemini-embedding-001` at **1024 dims** via the OpenAI-compat `dimensions`
+param (MRL truncation; cosine is magnitude-invariant so no renormalization), so the schema stays
+`vector(1024)`, not the sample's 1536. No `google-*` SDK — plain httpx over the OpenAI-compat REST keeps
+the image CPU-only. (The `.omo/plans/backend-orchestrator.md` work plan holds the authoritative Gemini
+OVERRIDE detail.)
 
 ### Locked decisions
 
@@ -25,9 +32,9 @@ at `INFERENCE_BASE_URL` for both `/v1/chat/completions` and `/v1/embeddings`. Em
 | Write gate | Parent task **checkpoints the DAG** and suspends (`status=awaiting_confirmation`); confirm/deny spawns a **resume task** that continues from the checkpoint | Durable continuation — not a re-plan/re-run |
 | Pre-computation | **One 15-min Celery beat**: background sync that fetches new emails/events/files **and indexes/embeds them inline** in the same pass | Single beat, no separate embed cron; rows are searchable as soon as sync writes them |
 | Caching | Redis caches (a) input **query embeddings** (1h TTL), (b) **intent classifications**, (c) **conversation context** | The three hot, recomputable artifacts; corpus embeddings live in pgvector, not Redis |
-| Embeddings | BGE/GTE-large @ 1024 | `vector(1024)`; BGE query instruction prefix wired in |
-| Reranking | Hybrid first; add `bge-reranker-v2-m3` only if golden-set Precision@5 < 0.8 | Keeps latency low by default |
-| Inference infra | External via env (`INFERENCE_BASE_URL`, `CHAT_MODEL`, `EMBED_MODEL`) | App docker-compose stays CPU-only |
+| Embeddings | **Gemini `gemini-embedding-001` @ 1024** (OpenAI-compat `dimensions=1024`, MRL) | `vector(1024)`; BGE prefix N/A → symmetric query/corpus embedding; cosine (magnitude-invariant) |
+| Reranking | Hybrid first; add `bge-reranker-v2-m3` only if golden-set Precision@5 < 0.8 | Keeps latency low by default; **disabled with Gemini (no rerank endpoint) unless a separate reranker service is added** |
+| Inference infra | **Gemini AI Studio (free tier)** via env (`GEMINI_STUDIO_API_KEY`, `INFERENCE_BASE_URL`, `CHAT_MODEL`, `EMBED_MODEL`) | External; app docker-compose stays CPU-only; free-tier throttle + `429` backoff |
 | Eval harness | Calls the pipeline coroutine **in-process** (bypasses Celery + HTTP) | Precision@5 and <500ms search latency stay measurable |
 | Bonuses | Conversation context, Conflict detection, WebSocket progress stream (+ Docker as required infra) | — |
 | Auth | FastAPI-native JWT: PyJWT HS256 · pwdlib (Argon2 primary, bcrypt fallback) · `OAuth2PasswordBearer` → `get_current_user` → `CurrentUser` dep | Stateless; no session store; `user_id` established at HTTP boundary, passed as plain UUID argument to every Celery task; JWT tokens never stored in Redis or forwarded into task bodies |
@@ -75,8 +82,10 @@ sync that also indexes/embeds new items) plus the on-demand **orchestrate** / **
 ```
 backend/
   main.py                FastAPI app + router/ws wiring
-  config.py              pydantic-settings (DB, Redis, INFERENCE_BASE_URL, CHAT_MODEL, EMBED_MODEL,
-                         RERANK_MODEL, EMBED_DIM=1024, DEFAULT_TZ, rate limits, SYNC_BEAT_MINUTES=15,
+  config.py              pydantic-settings (DB, Redis, GEMINI_STUDIO_API_KEY, INFERENCE_BASE_URL
+                         [Gemini OpenAI-compat base], CHAT_MODEL, EMBED_MODEL, RERANK_MODEL, EMBED_DIM=1024,
+                         EMBED_MODE=fake|real, EMBED_QUERY_PREFIX, GEMINI_MAX_CONCURRENCY / EMBED_BATCH_SIZE /
+                         MAX_RETRIES, DEFAULT_TZ, rate limits, SYNC_BEAT_MINUTES=15,
                          SECRET_KEY [**no default — raises `ValueError` at startup if unset**; generate:
                          `python -c "import secrets; print(secrets.token_urlsafe(32))"`],
                          ALGORITHM="HS256", ACCESS_TOKEN_EXPIRE_MINUTES=60*24*8 [8 days],
