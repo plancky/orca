@@ -36,6 +36,3 @@ htmlcov/
 .vscode/
 *.swp
 .DS_Store
-
-# Generated
-openapi.json

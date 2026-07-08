@@ -1,7 +1,7 @@
 import uuid
-from typing import Any
+from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Body, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -24,27 +24,38 @@ class QueryRequest(BaseModel):
     conversation_id: uuid.UUID | None = None
     confirm: ConfirmAction | None = None
 
-    model_config = {
-        "json_schema_extra": {
-            "examples": [
-                {"query": "Find emails from bob@example.com"},
-                {
-                    "query": "Yes, send it.",
-                    "conversation_id": "00000000-0000-0000-0000-000000000000",
-                    "confirm": {
-                        "action_id": "00000000-0000-0000-0000-000000000000",
-                        "decision": "approved",
-                    },
-                },
-            ]
-        }
-    }
-
 
 class QueryResponse(BaseModel):
     task_id: uuid.UUID
     status: str
     conversation_id: uuid.UUID
+
+
+_QUERY_EXAMPLES = {
+    "single_service": {
+        "summary": "Single service — routes to one agent",
+        "value": {"query": "Find emails from sarah@company.com about the budget"},
+    },
+    "multi_service": {
+        "summary": "Multi service — parallel reads across agents",
+        "value": {"query": "Prepare for tomorrow's meeting with Acme Corp"},
+    },
+    "hard_ambiguous": {
+        "summary": "Hard case — ambiguity triggers a clarification",
+        "value": {"query": "Move the meeting with John"},
+    },
+    "confirm_action": {
+        "summary": "Confirm a write-gated action (resume from checkpoint)",
+        "value": {
+            "query": "Yes, send it.",
+            "conversation_id": "00000000-0000-0000-0000-000000000000",
+            "confirm": {
+                "action_id": "00000000-0000-0000-0000-000000000000",
+                "decision": "approved",
+            },
+        },
+    },
+}
 
 
 @router.post(
@@ -53,7 +64,7 @@ class QueryResponse(BaseModel):
     status_code=status.HTTP_202_ACCEPTED,
 )
 async def submit_query(
-    req: QueryRequest,
+    req: Annotated[QueryRequest, Body(openapi_examples=_QUERY_EXAMPLES)],
     user: CurrentUser,
     session: AsyncSession = Depends(get_session),
 ) -> Any:
