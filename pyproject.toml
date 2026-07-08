@@ -52,3 +52,7 @@ markers = ["llm: marks tests that require a live INFERENCE_BASE_URL (deselect wi
 
 [tool.ruff.lint]
 select = ["E", "F", "I"]
+
+[tool.ruff.lint.per-file-ignores]
+# Alembic migrations are generated-style DDL; long op.create_table lines are idiomatic.
+"backend/migrations/versions/*" = ["E501"]
