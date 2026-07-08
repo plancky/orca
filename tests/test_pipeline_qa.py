@@ -28,13 +28,7 @@ global_fake = FakeLLMClient()
 @pytest.fixture(autouse=True)
 def mock_all_llm(monkeypatch):
     import backend.llm.client
-    monkeypatch.setattr(backend.llm.client, "llm_client", global_fake)
-
-    # Force patch into modules that already imported it
-    import backend.orchestration.executor as exe
-    import backend.orchestration.stages.classifier as cls
-    monkeypatch.setattr(cls, "llm_client", global_fake)
-    monkeypatch.setattr(exe, "llm_client", global_fake)
+    monkeypatch.setattr(backend.llm.client.LLMClient, "chat", global_fake.chat)
 
 @pytest.mark.asyncio
 async def test_pipeline_happy():

@@ -43,8 +43,16 @@ async def append_turn_messages(
         seq=assistant_seq,
         intent=intent,
         plan=plan,
-        actions_taken=[a.model_dump(mode="json") for a in task_result.actions_taken] if task_result.actions_taken else None,
-        pending_actions=[p.model_dump(mode="json") for p in task_result.pending_actions] if task_result.pending_actions else None,
+        actions_taken=(
+            [a.model_dump(mode="json") for a in task_result.actions_taken]
+            if task_result.actions_taken
+            else None
+        ),
+        pending_actions=(
+            [p.model_dump(mode="json") for p in task_result.pending_actions]
+            if task_result.pending_actions
+            else None
+        ),
     )
     session.add(assistant_msg)
 

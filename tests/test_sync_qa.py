@@ -83,8 +83,14 @@ async def test_sync_happy_path(user_fixture):
             ).scalars().all()
             assert len(gmail_ds2) == 8
 
-        resp2 = await client.post(
-            "/api/v1/sync/trigger", headers={"Authorization": f"Bearer {token}"}
-        )
+        # Trigger endpoint just sets status = "enqueued" and calls delay.
+        # But in tests, celery eager mode runs sync_all_users synchronously,
+        # which uses asyncio.run and fails.
+        # So we patch the celery task delay function to avoid running it.
+        from unittest.mock import patch
+        with patch("backend.workers.sync.sync_all_users.delay"):
+            resp2 = await client.post(
+                "/api/v1/sync/trigger", headers={"Authorization": f"Bearer {token}"}
+            )
         assert resp2.status_code == 200
         assert resp2.json()["status"] == "enqueued"

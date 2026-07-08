@@ -24,6 +24,16 @@ def frozen_clock() -> dt.datetime:
     return FROZEN_NOW
 
 
+@pytest.fixture(autouse=True)
+def flush_redis():
+    import os  # noqa: PLC0415
+
+    import redis  # noqa: PLC0415
+    client = redis.from_url(os.environ.get("REDIS_URL", "redis://localhost:6399/0"))
+    client.flushdb()
+    client.close()
+
+
 @pytest.fixture
 def stub_llm_factory(monkeypatch):
     def _install(response):
