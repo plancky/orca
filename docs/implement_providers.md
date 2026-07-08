@@ -131,13 +131,16 @@ normalize → cache-row mapper reusing the existing `embedder` (batch + Redis ca
 ## 8. Sync worker (`app/workers/sync.py`)
 
 Replace "refresh seed deltas" with provider-driven ingestion. Per active user + service: load creds
-→ incremental fetch (fallback to full if no cursor / on `410`) → batch-embed new/changed rows →
-upsert `*_cache` → delete removed → update `sync_status(last_synced_at, item_count, cursor)`.
+→ incremental fetch (fallback to full if no cursor / on `410`) → **embed each new/changed item inline**
+→ upsert `*_cache` (with vector) → delete removed → update `sync_status(last_synced_at, item_count,
+cursor)`. Sync **and** index/embed happen in the one 15-min pass (see `docs/PLAN.md`), so freshly-synced
+items are searchable immediately.
 
 Celery tasks are **sync**, so they call the client directly (**no `to_thread` needed** — a real
-benefit of doing bulk work in Celery). Backoff/quota: retry `429` / `403 rateLimitExceeded` with
-exponential backoff + jitter; per-user Redis **token bucket** against the 250 units/s budget; batch
-to cut round-trips. Initial full sync enqueued at first auth.
+benefit of doing bulk work in Celery), and the embed step batches (~64) within the pass to keep the
+model-server round-trips down. Backoff/quota: retry `429` / `403 rateLimitExceeded` with exponential
+backoff + jitter; per-user Redis **token bucket** against the 250 units/s budget; batch to cut
+round-trips. Initial full sync enqueued at first auth.
 
 ## 9. Migration (`app/migrations/`)
 
