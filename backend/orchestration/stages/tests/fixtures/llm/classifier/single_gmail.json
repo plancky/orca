@@ -1,0 +1,10 @@
+{
+  "services": ["gmail"],
+  "intent": "search_emails",
+  "entities": {
+    "sender": "sarah@company.com",
+    "topic": "budget"
+  },
+  "steps": ["search_emails_from_sarah_about_budget"],
+  "needs_clarification": false
+}

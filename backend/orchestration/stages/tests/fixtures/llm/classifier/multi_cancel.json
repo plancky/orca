@@ -1,0 +1,9 @@
+{
+  "services": ["gmail", "gcal"],
+  "intent": "cancel_flight",
+  "entities": {
+    "airline": "Turkish Airlines"
+  },
+  "steps": ["find_flight_email", "delete_calendar_event", "draft_cancellation_email"],
+  "needs_clarification": false
+}

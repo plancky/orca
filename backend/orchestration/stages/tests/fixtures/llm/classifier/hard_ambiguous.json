@@ -1,0 +1,8 @@
+{
+  "services": [],
+  "intent": "ambiguous_request",
+  "entities": {},
+  "steps": [],
+  "needs_clarification": true,
+  "clarification": "Which meeting with John do you want to move, and to what time?"
+}
