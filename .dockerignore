@@ -1,0 +1,32 @@
+# VCS / project meta
+.git
+.gitignore
+.omo
+docs
+
+# Python caches
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Virtual envs (rebuilt inside the image)
+.venv
+venv
+
+# Tests + co-located stage fixtures (not needed in the runtime image)
+tests
+**/test_*.py
+**/conftest.py
+**/fixtures/
+.pytest_cache
+.ruff_cache
+
+# Local env / secrets
+.env
+.env.*
+!.env.example
+
+# Generated
+openapi.json
