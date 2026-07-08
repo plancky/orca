@@ -1,0 +1,10 @@
+{
+  "nodes": [
+    {
+      "id": "n1",
+      "tool": "gmail.search_emails",
+      "depends_on": "should-be-list",
+      "args": {"query": "test"}
+    }
+  ]
+}

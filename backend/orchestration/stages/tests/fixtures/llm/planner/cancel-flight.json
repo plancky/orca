@@ -1,0 +1,22 @@
+{
+  "nodes": [
+    {
+      "id": "n1",
+      "tool": "gmail.search_emails",
+      "args": {"query": "flight booking"},
+      "depends_on": []
+    },
+    {
+      "id": "n2",
+      "tool": "gcal.search_events",
+      "args": {"query": "$n1.booking_ref"},
+      "depends_on": ["n1"]
+    },
+    {
+      "id": "n3",
+      "tool": "gcal.delete_event",
+      "args": {"event_id": "$n2.event_id"},
+      "depends_on": ["n2"]
+    }
+  ]
+}

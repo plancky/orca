@@ -1,0 +1,10 @@
+{
+  "nodes": [
+    {
+      "id": "n1",
+      "tool": "gmail.search_emails",
+      "args": {"sender": "boss@example.com", "query": "budget"},
+      "depends_on": []
+    }
+  ]
+}

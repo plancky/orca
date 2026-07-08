@@ -1,0 +1,10 @@
+{
+  "nodes": [
+    {
+      "id": "n1",
+      "tool": "hallucinated.tool",
+      "depends_on": [],
+      "args": {}
+    }
+  ]
+}

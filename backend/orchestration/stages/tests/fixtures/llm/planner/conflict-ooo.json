@@ -1,0 +1,22 @@
+{
+  "nodes": [
+    {
+      "id": "n1",
+      "tool": "drive.search_files",
+      "args": {"query": "OOO"},
+      "depends_on": []
+    },
+    {
+      "id": "n2",
+      "tool": "gcal.search_events",
+      "args": {"query": "OOO"},
+      "depends_on": []
+    },
+    {
+      "id": "n3",
+      "tool": "conflict.detect",
+      "args": {"doc_id": "$n1.file_id", "events": "$n2.events"},
+      "depends_on": ["n1", "n2"]
+    }
+  ]
+}
