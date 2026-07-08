@@ -1,0 +1,22 @@
+{
+  "nodes": [
+    {
+      "id": "n1",
+      "tool": "gcal.search_events",
+      "args": {"query": "Q3 Planning"},
+      "depends_on": []
+    },
+    {
+      "id": "n2",
+      "tool": "gmail.search_emails",
+      "args": {"query": "Q3 Planning"},
+      "depends_on": []
+    },
+    {
+      "id": "n3",
+      "tool": "drive.search_files",
+      "args": {"query": "Q3 Planning"},
+      "depends_on": []
+    }
+  ]
+}
