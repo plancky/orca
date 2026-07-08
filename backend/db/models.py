@@ -381,10 +381,20 @@ class SyncStatus(SQLModel, table=True):
 async def get_next_message_seq(
     session: AsyncSession, conversation_id: uuid.UUID
 ) -> int:
-    """Return the next ``seq`` for a conversation (locked read)."""
-    result = await session.execute(
-        select(func.coalesce(func.max(Message.seq), -1) + 1)
-        .where(Message.conversation_id == conversation_id)
+    """Return the next ``seq`` for a conversation.
+
+    Locks the parent Conversation row (FOR UPDATE) to serialize concurrent
+    turns, then computes MAX(seq)+1 — Postgres forbids FOR UPDATE on an
+    aggregate select, so the lock is taken on the Conversation row instead.
+    """
+    await session.execute(
+        select(Conversation.id)
+        .where(Conversation.id == conversation_id)
         .with_for_update()
+    )
+    result = await session.execute(
+        select(func.coalesce(func.max(Message.seq), -1) + 1).where(
+            Message.conversation_id == conversation_id
+        )
     )
     return result.scalar_one()
