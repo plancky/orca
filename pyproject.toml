@@ -26,6 +26,7 @@ dependencies = [
 dev = [
     "pytest>=8.0",
     "pytest-anyio>=0.0.0",
+    "pytest-asyncio>=0.24",
     "anyio[trio]>=4.0",
     "httpx>=0.27",
     "ruff>=0.5",
@@ -38,6 +39,7 @@ dev = [
 dev = [
     "pytest>=8.0",
     "pytest-anyio>=0.0.0",
+    "pytest-asyncio>=0.24",
     "anyio[trio]>=4.0",
     "httpx>=0.27",
     "ruff>=0.5",
@@ -48,7 +50,8 @@ package = false
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-markers = ["llm: marks tests that require a live INFERENCE_BASE_URL (deselect with -m 'not llm')"]
+pythonpath = ["."]
+markers = ["llm: requires live GEMINI_STUDIO_API_KEY (deselect with -m 'not llm')"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I"]
@@ -56,3 +59,5 @@ select = ["E", "F", "I"]
 [tool.ruff.lint.per-file-ignores]
 # Alembic migrations are generated-style DDL; long op.create_table lines are idiomatic.
 "backend/migrations/versions/*" = ["E501"]
+# conftest MUST set TESTING/SECRET_KEY/EMBED_MODE env before importing backend.
+"tests/conftest.py" = ["E402"]
