@@ -1,0 +1,8 @@
+{
+  "services": [],
+  "intent": "ambiguous_request",
+  "entities": {},
+  "steps": [],
+  "needs_clarification": true,
+  "clarification": "Which proposal are you referring to?"
+}

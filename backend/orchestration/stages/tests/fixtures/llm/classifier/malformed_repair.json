@@ -1,0 +1,9 @@
+{
+  "services": ["gcal"],
+  "intent": "check_calendar",
+  "entities": {
+    "timeframe_phrase": "next week"
+  },
+  "steps": ["check_events"],
+  "needs_clarification": false
+}

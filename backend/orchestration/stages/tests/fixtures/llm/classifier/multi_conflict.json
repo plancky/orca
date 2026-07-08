@@ -1,0 +1,10 @@
+{
+  "services": ["gcal", "drive"],
+  "intent": "detect_conflicts",
+  "entities": {
+    "timeframe_phrase": "next week",
+    "topic": "out-of-office doc"
+  },
+  "steps": ["get_ooo_doc_dates", "search_events_next_week", "detect_overlap"],
+  "needs_clarification": false
+}

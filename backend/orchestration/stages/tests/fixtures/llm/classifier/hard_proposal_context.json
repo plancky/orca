@@ -1,0 +1,9 @@
+{
+  "services": ["gmail"],
+  "intent": "get_email",
+  "entities": {
+    "topic": "the proposal"
+  },
+  "steps": ["find_email_about_proposal_from_context"],
+  "needs_clarification": false
+}

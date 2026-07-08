@@ -1,0 +1,10 @@
+{
+  "services": ["gcal", "gmail", "drive"],
+  "intent": "prepare_for_meeting",
+  "entities": {
+    "org": "Acme Corp",
+    "timeframe_phrase": "tomorrow"
+  },
+  "steps": ["find_tomorrow_meeting", "find_emails_acme", "find_drive_files_acme"],
+  "needs_clarification": false
+}

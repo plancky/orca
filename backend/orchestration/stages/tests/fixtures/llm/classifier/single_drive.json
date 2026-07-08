@@ -1,0 +1,10 @@
+{
+  "services": ["drive"],
+  "intent": "search_files",
+  "entities": {
+    "file_type": "PDF",
+    "timeframe_phrase": "last month"
+  },
+  "steps": ["search_drive_for_pdfs_last_month"],
+  "needs_clarification": false
+}
