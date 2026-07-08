@@ -8,14 +8,13 @@ x-app-environment: &app-environment
   CHAT_MODEL: ${CHAT_MODEL:-gemini-2.5-flash}
   EMBED_MODEL: ${EMBED_MODEL:-gemini-embedding-001}
 
+# One multi-stage image (see ./Dockerfile), three roles differing only by
+# `command:`. Built once, tagged, and reused by api/worker/beat.
 x-app-base: &app-base
-  image: python:3.12-slim
-  working_dir: /app
-  init: true
+  build:
+    context: .
+  image: workspace-orchestrator:local
   environment: *app-environment
-  volumes:
-    - .:/app
-    - app-venv:/app/.venv
   depends_on:
     postgres:
       condition: service_healthy
@@ -50,20 +49,35 @@ services:
       timeout: 3s
       retries: 10
 
+  # API — I/O-bound (enqueues + reads task rows); 2 uvicorn workers.
   api:
     <<: *app-base
-    command: sh -c "pip install --no-cache-dir uv && uv sync && uv run uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload"
+    command: uvicorn backend.main:app --host 0.0.0.0 --port 8000 --workers 2
     ports:
       - "${API_HOST_PORT:-8000}:8000"
 
+  # Celery worker — heavy tenant. Low concurrency guards against any sync call
+  # (Argon2, blocking I/O) pinning a prefork child + RAM x children.
   worker:
     <<: *app-base
-    command: sh -c "pip install --no-cache-dir uv && uv sync && uv run celery -A backend.workers.celery_app worker --pool=prefork --concurrency=2 --loglevel=info"
+    command: celery -A backend.workers.celery_app worker --pool=prefork --concurrency=2 --loglevel=info
+    # No HTTP surface — the image's API /health probe never applies here.
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A backend.workers.celery_app inspect ping -t 5 >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
+  # Celery beat — exactly ONE, never scale. Two beats => double-fired 15-min
+  # sync => duplicate embeds + free-tier rate-limit burn.
   beat:
     <<: *app-base
-    command: sh -c "pip install --no-cache-dir uv && uv sync && uv run celery -A backend.workers.celery_app beat --loglevel=info"
+    command: celery -A backend.workers.celery_app beat --loglevel=info
+    # Beat has no natural probe (PLAN.md l.834-835); disable the inherited
+    # API /health check rather than report a permanent false "unhealthy".
+    healthcheck:
+      disable: true
 
 volumes:
   pgdata:
-  app-venv:
