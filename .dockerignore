@@ -1,8 +1,20 @@
 # VCS / project meta
 .git
 .gitignore
+.gitattributes
 .omo
 docs
+README.md
+DESIGN.md
+API.md
+.codegraph
+.python-version
+
+# Container / compose meta (never needed inside the image)
+Dockerfile
+.dockerignore
+docker-compose.yml
+docker-compose.*.yml
 
 # Python caches
 __pycache__
@@ -22,6 +34,14 @@ tests
 **/fixtures/
 .pytest_cache
 .ruff_cache
+.mypy_cache
+
+# Editors / OS / logs
+.idea
+.vscode
+*.swp
+.DS_Store
+*.log
 
 # Local env / secrets
 .env
