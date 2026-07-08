@@ -1,0 +1,110 @@
+{
+  "_note": "Golden retrieval set over the deterministic mock corpus (backend/providers/mock/_corpus_data.py). Each query maps to the *_datasource business ids (email_id / event_id / file_id) that are genuinely relevant. Graded by Precision@5 in backend/eval/evaluate.py. Item-id fields per service: gmail=email_id, gcal=event_id, gdrive=file_id.",
+  "queries": [
+    {
+      "id": "q01-sarah-budget",
+      "category": "single",
+      "query": "emails from sarah about the Q3 budget",
+      "services": ["gmail"],
+      "expected": ["sarah-budget-001", "sarah-budget-002"]
+    },
+    {
+      "id": "q02-turkish-booking",
+      "category": "single",
+      "query": "Turkish Airlines flight booking confirmation and PNR",
+      "services": ["gmail"],
+      "expected": ["tk-booking-001"]
+    },
+    {
+      "id": "q03-proposal-thread",
+      "category": "single",
+      "query": "the project proposal email thread",
+      "services": ["gmail"],
+      "expected": ["proposal-001", "proposal-002"]
+    },
+    {
+      "id": "q04-pdfs-last-month",
+      "category": "single",
+      "query": "PDF documents from last month",
+      "services": ["gdrive"],
+      "expected": ["pdf-financials-001", "pdf-contract-001"]
+    },
+    {
+      "id": "q05-financial-report",
+      "category": "single",
+      "query": "Q3 financial report revenue and operating margin",
+      "services": ["gdrive"],
+      "expected": ["pdf-financials-001"]
+    },
+    {
+      "id": "q06-vendor-contract",
+      "category": "single",
+      "query": "vendor contract draft for legal review",
+      "services": ["gdrive"],
+      "expected": ["pdf-contract-001"]
+    },
+    {
+      "id": "q07-calendar-next-week",
+      "category": "single",
+      "query": "calendar events scheduled for next week",
+      "services": ["gcal"],
+      "expected": ["nextweek-standup", "nextweek-review", "nextweek-client-call"]
+    },
+    {
+      "id": "q08-product-review",
+      "category": "single",
+      "query": "product roadmap review meeting",
+      "services": ["gcal"],
+      "expected": ["nextweek-review"]
+    },
+    {
+      "id": "q09-acme-meeting-event",
+      "category": "single",
+      "query": "meeting with Acme Corp on the calendar",
+      "services": ["gcal"],
+      "expected": ["acme-meeting-001"]
+    },
+    {
+      "id": "q10-prepare-acme-meeting",
+      "category": "multi",
+      "query": "help me prepare for my meeting with Acme Corp",
+      "services": ["gmail", "gcal", "gdrive"],
+      "expected": ["acme-agenda-001", "acme-meeting-001", "acme-doc-001"]
+    },
+    {
+      "id": "q11-acme-partnership-terms",
+      "category": "multi",
+      "query": "Acme Corp partnership pricing scope and timeline",
+      "services": ["gmail", "gdrive"],
+      "expected": ["acme-agenda-001", "acme-doc-001"]
+    },
+    {
+      "id": "q12-ooo-conflicts",
+      "category": "multi",
+      "query": "events next week that conflict with my out of office window",
+      "services": ["gcal", "gdrive"],
+      "expected": ["ooo-doc-001", "nextweek-standup", "nextweek-review", "nextweek-client-call"]
+    },
+    {
+      "id": "q13-john-doe-timeline",
+      "category": "multi",
+      "query": "John Doe from Acme about the project timeline meeting",
+      "services": ["gmail", "gcal"],
+      "expected": ["john-doe-001", "john-doe-sync"]
+    },
+    {
+      "id": "q14-lunch-with-john",
+      "category": "hard",
+      "query": "lunch catch up with John next week",
+      "services": ["gmail", "gcal"],
+      "expected": ["john-smith-001", "john-smith-1on1"]
+    },
+    {
+      "id": "q15-out-of-office-doc",
+      "category": "hard",
+      "query": "out of office schedule notice and dates to avoid meetings",
+      "services": ["gdrive"],
+      "expected": ["ooo-doc-001"]
+    }
+  ]
+}
