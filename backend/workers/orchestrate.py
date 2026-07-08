@@ -38,7 +38,12 @@ async def pipeline(
 
         try:
             intent = await classify(
-                query, context=None, now=None, tz=None, session=session, user_id=user_uuid
+                query,
+                context=None,
+                now=None,
+                tz=None,
+                session=session,
+                user_id=user_uuid,
             )
 
             if intent.needs_clarification:

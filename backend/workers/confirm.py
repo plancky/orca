@@ -72,14 +72,21 @@ async def resume(
             if isinstance(outcome, Checkpoint):
                 return {"status": "awaiting_confirmation"}
 
-            result = await synthesize(checkpoint.intent, outcome, None, llm_client=llm_client)
+            result = await synthesize(
+                checkpoint.intent, outcome, None, llm_client=llm_client
+            )
             task_row.result = result.model_dump(mode="json")
             task_row.status = TaskStatus.SUCCESS.value
             await session.commit()
 
             if task_row.conversation_id:
                 await append_turn_messages(
-                    session, task_row.conversation_id, user_uuid, decision, result, task_uuid,
+                    session,
+                    task_row.conversation_id,
+                    user_uuid,
+                    decision,
+                    result,
+                    task_uuid,
                     intent=checkpoint.intent.model_dump(mode="json"),
                     plan=checkpoint.plan.model_dump(mode="json")
                 )
