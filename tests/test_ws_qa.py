@@ -7,7 +7,6 @@ from fastapi.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 
 from backend.api.deps import get_redis
-from backend.config import settings
 from backend.core.security import create_access_token
 from backend.db.models import Conversation, Task, TaskStatus, User
 from backend.db.session import async_session_factory
