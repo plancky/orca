@@ -14,14 +14,9 @@ from backend.llm.prompts.classifier import CLASSIFIER_PROMPT
 from backend.orchestration.models.intent import Intent
 from backend.orchestration.utils.temporal import resolve_timeframe
 
-_redis_client = None
-
 
 def _get_redis() -> redis.Redis:
-    global _redis_client
-    if _redis_client is None:
-        _redis_client = redis.from_url(settings.REDIS_URL, decode_responses=True)
-    return _redis_client
+    return redis.from_url(settings.REDIS_URL, decode_responses=True)
 
 
 async def classify(
@@ -54,7 +49,7 @@ async def classify(
             cached = await redis_client.get(cache_key)
             if cached:
                 return Intent.model_validate_json(cached)
-        except Exception:
+        except (redis.RedisError, OSError):
             pass  # degrade gracefully if Redis is down
 
     prompt = CLASSIFIER_PROMPT.format(
@@ -87,7 +82,7 @@ async def classify(
     if user_id and cache_key:
         try:
             await redis_client.setex(cache_key, 3600, intent.model_dump_json())
-        except Exception:
+        except (redis.RedisError, OSError):
             pass
 
     return intent

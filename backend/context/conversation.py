@@ -11,14 +11,8 @@ from backend.db.models import Message, MessageRole, get_next_message_seq
 logger = logging.getLogger(__name__)
 
 
-_redis_client = None
-
-
 def _get_redis() -> redis.Redis:
-    global _redis_client
-    if _redis_client is None:
-        _redis_client = redis.from_url(settings.REDIS_URL, decode_responses=True)
-    return _redis_client
+    return redis.from_url(settings.REDIS_URL, decode_responses=True)
 
 
 async def get_conversation_context(
@@ -146,13 +140,3 @@ async def append_turn_messages(
             await pipe.execute()
     except Exception as e:
         logger.warning(f"Failed to push turn to Redis: {e}")
-
-
-async def get_or_create_conversation(
-    session,
-    user_id: uuid.UUID,
-    conversation_id: uuid.UUID | None,
-    title: str | None = None,
-):
-    """Stub — Wave D2 fills this."""
-    raise NotImplementedError("Wave D2 fills this")

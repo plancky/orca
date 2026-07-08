@@ -15,9 +15,8 @@ fully offline (no model server, no quota).
 import uuid
 from typing import Any
 
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import SQLModel
+from sqlmodel import SQLModel, col, select
 
 from backend.agents.base import Provider
 from backend.db.models import (
@@ -43,7 +42,7 @@ _DATASOURCE: dict[str, tuple[type[SQLModel], str]] = {
 
 def _row_to_dict(row: SQLModel) -> dict[str, Any]:
     """Flatten a datasource row to its column values (no relationships)."""
-    return {col.name: getattr(row, col.name) for col in row.__table__.columns}  # type: ignore[attr-defined]
+    return {c.name: getattr(row, c.name) for c in type(row).__table__.columns}
 
 
 class MockProvider(Provider):
@@ -88,12 +87,14 @@ class MockProvider(Provider):
     async def get(self, service: str, item_id: str) -> dict:
         model, business_id = _DATASOURCE[service]
         session = self._require_session()
-        stmt = select(model).where(model.user_id == self._require_user())  # type: ignore[attr-defined]
+        stmt = select(model).where(
+            col(getattr(model, "user_id")) == self._require_user()
+        )
         parsed = _maybe_uuid(item_id)
         stmt = stmt.where(
-            model.id == parsed  # type: ignore[attr-defined]
+            col(getattr(model, "id")) == parsed
             if parsed is not None
-            else getattr(model, business_id) == item_id
+            else col(getattr(model, business_id)) == item_id
         )
         row = (await session.execute(stmt)).scalars().first()
         return _row_to_dict(row) if row is not None else {}

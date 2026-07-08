@@ -1,11 +1,13 @@
+import functools
 import uuid
 from typing import Annotated, Any
 
+import anyio
 from fastapi import APIRouter, Body, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.api.deps import CurrentUser, get_session
+from backend.api.deps import CurrentUser, enforce_rate_limit, get_session
 from backend.db.models import ActionsLog, Conversation, Task, TaskKind, TaskStatus
 from backend.orchestration.utils.checkpoint import get_checkpoint_for_action
 from backend.workers.confirm import run_resume
@@ -62,6 +64,7 @@ _QUERY_EXAMPLES = {
     "",
     response_model=QueryResponse,
     status_code=status.HTTP_202_ACCEPTED,
+    dependencies=[Depends(enforce_rate_limit)],
 )
 async def submit_query(
     req: Annotated[QueryRequest, Body(openapi_examples=_QUERY_EXAMPLES)],
@@ -102,7 +105,15 @@ async def submit_query(
         await session.commit()
         await session.refresh(task)
 
-        run_resume.delay(cp.dump(), req.confirm.decision, str(task.id), str(u_id))
+        await anyio.to_thread.run_sync(
+            functools.partial(
+                run_resume.delay,
+                cp.dump(),
+                req.confirm.decision,
+                str(task.id),
+                str(u_id),
+            )
+        )
 
         return QueryResponse(
             task_id=task.id,
@@ -128,7 +139,15 @@ async def submit_query(
     await session.commit()
     await session.refresh(task)
 
-    run_pipeline.delay(str(task.id), str(u_id), req.query, str(conv_id))
+    await anyio.to_thread.run_sync(
+        functools.partial(
+            run_pipeline.delay,
+            str(task.id),
+            str(u_id),
+            req.query,
+            str(conv_id),
+        )
+    )
 
     return QueryResponse(
         task_id=task.id,

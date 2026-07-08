@@ -8,7 +8,7 @@ with the Alembic migration in Wave 0 and must import standalone (no live DB).
 Table-name conventions (SQLModel lowercases the class name by default):
 * ``User`` -> ``user``            ``Task`` -> ``task``
 * ``Conversation`` -> ``conversation``   ``Message`` -> ``message``
-* ``ActionsLog`` -> ``actionslog``       ``SyncStatus`` -> ``sync_status``
+* ``ActionsLog`` -> ``actions_log``      ``SyncStatus`` -> ``sync_status``
 * ``GmailDatasource`` -> ``gmail_datasource`` / ``GmailChunk`` -> ``gmail_vector_store``
 * GCal / GDrive mirror Gmail (``gcal_datasource``/``gcal_vector_store``,
   ``gdrive_datasource``/``gdrive_vector_store``).
@@ -347,6 +347,7 @@ class GDriveChunk(SQLModel, table=True):
 # Actions log (audit + write-confirmation gate) and per-user sync status.
 # --------------------------------------------------------------------------- #
 class ActionsLog(SQLModel, table=True):
+    __tablename__ = "actions_log"
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     user_id: uuid.UUID = Field(
         foreign_key="user.id", nullable=False, ondelete="CASCADE"

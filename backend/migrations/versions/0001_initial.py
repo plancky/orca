@@ -223,7 +223,7 @@ def upgrade() -> None:
     )
 
     op.create_table(
-        "actionslog",
+        "actions_log",
         sa.Column("id", sa.Uuid(), primary_key=True, nullable=False),
         sa.Column(
             "user_id",
@@ -287,7 +287,7 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.drop_table("sync_status")
-    op.drop_table("actionslog")
+    op.drop_table("actions_log")
     op.drop_table("gdrive_vector_store")
     op.drop_table("gcal_vector_store")
     op.drop_table("gmail_vector_store")

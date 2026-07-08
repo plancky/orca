@@ -20,7 +20,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import SQLModel, select
+from sqlmodel import SQLModel, col, select
 
 from backend.config import settings
 from backend.db.models import (
@@ -55,7 +55,7 @@ def _chunk_or_fallback(
 
 async def _resolve_seed_user(session: AsyncSession) -> uuid.UUID:
     superuser = (
-        await session.execute(select(User).where(User.is_superuser.is_(True)))  # type: ignore[attr-defined]
+        await session.execute(select(User).where(col(User.is_superuser).is_(True)))
     ).scalars().first()
     if superuser is not None:
         return superuser.id
@@ -88,8 +88,8 @@ async def _upsert_datasource(
     existing = (
         await session.execute(
             select(model).where(
-                model.user_id == user_id,  # type: ignore[attr-defined]
-                getattr(model, key_field) == item[key_field],
+                col(getattr(model, "user_id")) == user_id,
+                col(getattr(model, key_field)) == item[key_field],
             )
         )
     ).scalars().first()
@@ -117,7 +117,7 @@ async def _replace_chunks(
     # asyncpg binary codec AND the model's VECTOR type stringifies on bind — the two
     # collide on an ORM insert, so the embedding is bound as a raw list that the
     # codec encodes. Table name is a frozen __tablename__ constant (no injection).
-    table = chunk_model.__tablename__  # type: ignore[attr-defined]
+    table = getattr(chunk_model, "__tablename__")
     await session.execute(
         text(f"DELETE FROM {table} WHERE datasource_id = :datasource_id"),
         {"datasource_id": datasource_id},
