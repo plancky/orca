@@ -29,25 +29,12 @@ global_fake = FakeLLMClient()
 def mock_all_llm(monkeypatch):
     import backend.llm.client
     monkeypatch.setattr(backend.llm.client, "llm_client", global_fake)
-    
+
     # Force patch into modules that already imported it
     import backend.orchestration.executor as exe
     import backend.orchestration.stages.classifier as cls
     monkeypatch.setattr(cls, "llm_client", global_fake)
     monkeypatch.setattr(exe, "llm_client", global_fake)
-
-    # Patch get_next_message_seq because the provided one has invalid Postgres syntax
-    import backend.context.conversation
-    async def mock_seq(session, conv_id):
-        from sqlalchemy import func, select
-
-        from backend.db.models import Message
-        res = await session.execute(
-            select(func.coalesce(func.max(Message.seq), -1) + 1)
-            .where(Message.conversation_id == conv_id)
-        )
-        return res.scalar_one()
-    monkeypatch.setattr(backend.context.conversation, "get_next_message_seq", mock_seq)
 
 @pytest.mark.asyncio
 async def test_pipeline_happy():
@@ -62,7 +49,13 @@ async def test_pipeline_happy():
         }),
         json.dumps({
             "nodes": [
-                {"id": "n1", "tool": "gmail.search_emails", "args": {"query": "budget"}, "optional": False, "depends_on": []}
+                {
+                    "id": "n1",
+                    "tool": "gmail.search_emails",
+                    "args": {"query": "budget"},
+                    "optional": False,
+                    "depends_on": [],
+                }
             ]
         }),
         json.dumps({"response": "Here are your emails.", "actions_taken": []})
@@ -84,7 +77,12 @@ async def test_pipeline_happy():
         await session.commit()
         await session.refresh(task)
 
-    res = await pipeline(str(task.id), str(user.id), "emails from sarah about budget", str(conv.id))
+    res = await pipeline(
+        str(task.id),
+        str(user.id),
+        "emails from sarah about budget",
+        str(conv.id),
+    )
     assert res["status"] == "success", res.get("error")
 
     async with async_session_factory() as session:
@@ -93,7 +91,11 @@ async def test_pipeline_happy():
         assert task_row.result is not None
         assert "response" in task_row.result
 
-        stmt = select(Message).where(Message.conversation_id == conv.id).order_by(Message.seq)
+        stmt = (
+            select(Message)
+            .where(Message.conversation_id == conv.id)
+            .order_by(Message.seq)
+        )
         messages = (await session.execute(stmt)).scalars().all()
         assert len(messages) == 2
         assert messages[0].role == "user"
@@ -115,14 +117,29 @@ async def test_pipeline_write_resume():
         }),
         json.dumps({
             "nodes": [
-                {"id": "n1", "tool": "gmail.send_email", "args": {"to": "test@test.com", "subject": "hi", "body": "hi"}, "optional": False, "depends_on": []}
+                {
+                    "id": "n1",
+                    "tool": "gmail.send_email",
+                    "args": {
+                        "to": "test@test.com",
+                        "subject": "hi",
+                        "body": "hi",
+                    },
+                    "optional": False,
+                    "depends_on": [],
+                }
             ]
         }),
-        json.dumps({"response": "Email sent (not really, denied).", "actions_taken": []})
+        json.dumps(
+            {"response": "Email sent (not really, denied).", "actions_taken": []}
+        )
     ]
 
     async with async_session_factory() as session:
-        user = User(email=f"write_{uuid.uuid4().hex[:8]}@test.com", hashed_password="pw")
+        user = User(
+            email=f"write_{uuid.uuid4().hex[:8]}@test.com",
+            hashed_password="pw",
+        )
         session.add(user)
         await session.commit()
         await session.refresh(user)
@@ -132,13 +149,17 @@ async def test_pipeline_write_resume():
         await session.commit()
         await session.refresh(conv)
 
-        # Parent task (pipeline)
         task = Task(user_id=user.id, conversation_id=conv.id)
         session.add(task)
         await session.commit()
         await session.refresh(task)
 
-    res = await pipeline(str(task.id), str(user.id), "send an email", str(conv.id))
+    res = await pipeline(
+        str(task.id),
+        str(user.id),
+        "send an email",
+        str(conv.id),
+    )
     assert res["status"] == "awaiting_confirmation", res.get("error")
 
     async with async_session_factory() as session:
@@ -146,14 +167,16 @@ async def test_pipeline_write_resume():
         assert task_row.status == "awaiting_confirmation"
         assert task_row.checkpoint is not None
 
-        # Check pending actions_log
         stmt = select(ActionsLog).where(ActionsLog.task_id == task.id)
         action_log = (await session.execute(stmt)).scalars().first()
         assert action_log is not None
         assert action_log.status == "pending"
 
-        # Create confirm task
-        new_task = Task(user_id=user.id, conversation_id=conv.id, parent_task_id=task.id)
+        new_task = Task(
+            user_id=user.id,
+            conversation_id=conv.id,
+            parent_task_id=task.id,
+        )
         session.add(new_task)
         await session.commit()
         await session.refresh(new_task)
