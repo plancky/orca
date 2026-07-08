@@ -17,6 +17,12 @@ class FakeRedis:
     def __init__(self):
         self.streams = {}
 
+    async def incr(self, key):
+        return 1
+    
+    async def expire(self, key, time):
+        pass
+
     async def xadd(self, key, fields):
         if key not in self.streams:
             self.streams[key] = []
@@ -76,7 +82,7 @@ async def test_ws_qa_happy():
     await fake_redis.xadd(
         stream_key,
         {
-            "payload": json.dumps(
+            "data": json.dumps(
                 {
                     "type": "node_started",
                     "task_id": str(task.id),

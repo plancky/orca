@@ -1,8 +1,10 @@
 import asyncio
+import functools
 import json
 import logging
 import uuid
 
+import anyio
 import jwt
 from fastapi import APIRouter, Depends, Query, WebSocket, WebSocketDisconnect
 from jwt.exceptions import InvalidTokenError
@@ -83,11 +85,14 @@ async def ws_query(
         task_id_str = str(new_task.id)
 
         # Enqueue Celery task
-        run_pipeline.delay(
-            task_id=task_id_str,
-            user_id=str(user.id),
-            query=query,
-            conversation_id=str(conv_id),
+        await anyio.to_thread.run_sync(
+            functools.partial(
+                run_pipeline.delay,
+                task_id=task_id_str,
+                user_id=str(user.id),
+                query=query,
+                conversation_id=str(conv_id),
+            )
         )
 
         try:
@@ -129,14 +134,19 @@ async def ws_query(
                     for msg_id, msg_data in msgs:
                         last_id = msg_id
 
-                        if "payload" in msg_data:
+                        if "data" in msg_data:
                             try:
-                                event = json.loads(msg_data["payload"])
+                                event = json.loads(msg_data["data"])
                                 await websocket.send_json(event)
                                 if event.get("type") == "done":
                                     sent_done = True
                                     break
-                            except Exception as e:
+                            except (
+                                json.JSONDecodeError,
+                                ValueError,
+                                RuntimeError,
+                                WebSocketDisconnect,
+                            ) as e:
                                 logger.error(f"Failed to parse or send event: {e}")
 
             if sent_done:
@@ -176,5 +186,5 @@ async def ws_query(
     finally:
         try:
             await websocket.close()
-        except Exception:
+        except (RuntimeError, WebSocketDisconnect):
             pass

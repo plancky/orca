@@ -1,3 +1,6 @@
+import functools
+
+import anyio
 from fastapi import APIRouter
 from sqlalchemy import select
 
@@ -11,7 +14,7 @@ router = APIRouter(prefix="/sync", tags=["sync"])
 @router.post("/trigger")
 async def trigger_sync(user: CurrentUser) -> dict:
     """Enqueue sync for all users."""
-    sync_all_users.delay()
+    await anyio.to_thread.run_sync(functools.partial(sync_all_users.delay))
     return {"status": "enqueued"}
 
 

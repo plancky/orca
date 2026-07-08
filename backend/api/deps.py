@@ -8,7 +8,6 @@ historically shipped is a bug and is deliberately not reproduced here.
 """
 
 from datetime import datetime, timezone
-from functools import lru_cache
 from typing import Annotated
 from uuid import UUID
 
@@ -76,15 +75,15 @@ async def get_current_active_superuser(current_user: CurrentUser) -> User:
 # Rate limiting — Redis fixed-window token bucket, 100 requests/user/hour.
 # Provided here for the /query routes (Wave D) to attach; not gating auth.
 # --------------------------------------------------------------------------- #
-@lru_cache(maxsize=1)
 def get_redis() -> aioredis.Redis:
     return aioredis.from_url(settings.REDIS_URL, decode_responses=True)
 
 
-async def enforce_rate_limit(current_user: CurrentUser) -> None:
+async def enforce_rate_limit(
+    current_user: CurrentUser, redis=Depends(get_redis)
+) -> None:
     window = datetime.now(timezone.utc).strftime("%Y%m%d%H")
     key = f"ratelimit:{current_user.id}:{window}"
-    redis = get_redis()
     count = await redis.incr(key)
     if count == 1:
         await redis.expire(key, 3600)

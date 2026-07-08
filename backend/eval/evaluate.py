@@ -27,20 +27,22 @@ import asyncio
 import json
 import math
 import time
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import select
+from sqlmodel import col, select
 
 from backend.config import settings
-from backend.db.models import User
+from backend.db.models import Conversation, Task, TaskKind, TaskStatus, User
 from backend.db.session import async_session_factory
 from backend.embeddings.embedder import Embedder
 from backend.embeddings.reranker import rerank
 from backend.embeddings.search import hybrid_search
 from backend.providers.mock.seed_corpus import SEED_EMAIL, seed_corpus
+from backend.workers.orchestrate import pipeline
 
 _GOLDEN_PATH = Path(__file__).with_name("golden_set.json")
 _TOP_K = 5
@@ -155,7 +157,7 @@ async def _seeded_user_id(session: AsyncSession) -> str:
     """Resolve the existing seed user (F5 ``seed=False`` path: corpus pre-embedded)."""
     superuser = (
         await session.execute(
-            select(User.id).where(User.is_superuser.is_(True))  # type: ignore[attr-defined]
+            select(User.id).where(col(User.is_superuser).is_(True))
         )
     ).scalars().first()
     if superuser is not None:
@@ -268,6 +270,34 @@ async def run_eval(
     metrics = _aggregate(results)
     _print_report(metrics)
     _assert_thresholds(metrics)
+
+    if settings.EMBED_MODE == "real":
+        print("\n[eval] Running end-to-end smoke test (pipeline coroutine)...")
+        async with async_session_factory() as session:
+            user_uuid = uuid.UUID(user_id)
+            conv = Conversation(user_id=user_uuid, title="Eval Smoke Test")
+            session.add(conv)
+            await session.flush()
+            task = Task(
+                user_id=user_uuid,
+                conversation_id=conv.id,
+                kind=TaskKind.QUERY.value,
+                status=TaskStatus.QUEUED.value,
+            )
+            session.add(task)
+            await session.commit()
+            
+            task_id_str = str(task.id)
+            conv_id_str = str(conv.id)
+            
+        await pipeline(
+            task_id=task_id_str,
+            user_id=str(user_uuid),
+            query="Find emails from sarah@company.com about the budget",
+            conversation_id=conv_id_str,
+        )
+        print("[eval] End-to-end smoke test passed.")
+
     return metrics
 
 
