@@ -120,7 +120,7 @@ async def test_context_injection_in_classifier(monkeypatch):
 
     messages_captured = []
 
-    async def mock_chat(messages, response_format):
+    async def mock_chat(self, messages, response_format, **kwargs):
         messages_captured.extend(messages)
         return json.dumps(
             {
@@ -132,7 +132,7 @@ async def test_context_injection_in_classifier(monkeypatch):
             }
         )
 
-    monkeypatch.setattr(classifier.llm_client, "chat", mock_chat)
+    monkeypatch.setattr("backend.llm.client.LLMClient.chat", mock_chat)
 
     uid = uuid.uuid4()
     cid = uuid.uuid4()
