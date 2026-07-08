@@ -27,8 +27,18 @@ class Checkpoint(BaseModel):
 async def get_checkpoint_for_action(
     session, action_id: uuid.UUID
 ) -> "Checkpoint | None":
-    """Stub filled by Wave C3.
+    """Return the checkpoint from the parent task of an actions_log entry."""
+    from backend.db.models import ActionsLog, Task
 
-    Returns the checkpoint from the parent task of an actions_log entry.
-    """
-    raise NotImplementedError("Wave C3 fills this")
+    log_row = await session.get(ActionsLog, action_id)
+    if not log_row or not log_row.task_id:
+        return None
+
+    task_row = await session.get(Task, log_row.task_id)
+    if not task_row or not task_row.checkpoint:
+        return None
+
+    # Handle both string (JSON) and dict (JSONB parsed by SQLAlchemy)
+    if isinstance(task_row.checkpoint, str):
+        return Checkpoint.load(task_row.checkpoint)
+    return Checkpoint.model_validate(task_row.checkpoint)
