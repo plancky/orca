@@ -9,8 +9,9 @@ Table-name conventions (SQLModel lowercases the class name by default):
 * ``User`` -> ``user``            ``Task`` -> ``task``
 * ``Conversation`` -> ``conversation``   ``Message`` -> ``message``
 * ``ActionsLog`` -> ``actionslog``       ``SyncStatus`` -> ``sync_status``
-* ``GmailDatasource`` -> ``gmaildatasource`` / ``GmailChunk`` -> ``gmail_vector_store``
-* GCal / GDrive mirror Gmail (``gcal_vector_store`` / ``gdrive_vector_store``).
+* ``GmailDatasource`` -> ``gmail_datasource`` / ``GmailChunk`` -> ``gmail_vector_store``
+* GCal / GDrive mirror Gmail (``gcal_datasource``/``gcal_vector_store``,
+  ``gdrive_datasource``/``gdrive_vector_store``).
 """
 
 # allow: SIZE_OK — one cohesive DB schema (12 tables) frozen with the Alembic
@@ -221,6 +222,7 @@ class TaskPublic(SQLModel):
 # Gmail datasource + chunks (gmail_vector_store).
 # --------------------------------------------------------------------------- #
 class GmailDatasource(SQLModel, table=True):
+    __tablename__ = "gmail_datasource"
     __table_args__ = (UniqueConstraint("user_id", "email_id"),)
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     user_id: uuid.UUID = Field(
@@ -246,7 +248,7 @@ class GmailChunk(SQLModel, table=True):
     __table_args__ = (UniqueConstraint("datasource_id", "chunk_index"),)
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     datasource_id: uuid.UUID = Field(
-        foreign_key="gmaildatasource.id", nullable=False, ondelete="CASCADE"
+        foreign_key="gmail_datasource.id", nullable=False, ondelete="CASCADE"
     )
     user_id: uuid.UUID  # denormalized for no-join user prefilter
     thread_id: str | None = None  # denormalized for thread reconstruction
@@ -264,6 +266,7 @@ class GmailChunk(SQLModel, table=True):
 # GCal datasource + chunks (gcal_vector_store).
 # --------------------------------------------------------------------------- #
 class GCalDatasource(SQLModel, table=True):
+    __tablename__ = "gcal_datasource"
     __table_args__ = (UniqueConstraint("user_id", "event_id"),)
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     user_id: uuid.UUID = Field(
@@ -287,7 +290,7 @@ class GCalChunk(SQLModel, table=True):
     __table_args__ = (UniqueConstraint("datasource_id", "chunk_index"),)
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     datasource_id: uuid.UUID = Field(
-        foreign_key="gcaldatasource.id", nullable=False, ondelete="CASCADE"
+        foreign_key="gcal_datasource.id", nullable=False, ondelete="CASCADE"
     )
     user_id: uuid.UUID  # denormalized
     chunk_index: int
@@ -304,6 +307,7 @@ class GCalChunk(SQLModel, table=True):
 # GDrive datasource + chunks (gdrive_vector_store).
 # --------------------------------------------------------------------------- #
 class GDriveDatasource(SQLModel, table=True):
+    __tablename__ = "gdrive_datasource"
     __table_args__ = (UniqueConstraint("user_id", "file_id"),)
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     user_id: uuid.UUID = Field(
@@ -326,7 +330,7 @@ class GDriveChunk(SQLModel, table=True):
     __table_args__ = (UniqueConstraint("datasource_id", "chunk_index"),)
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     datasource_id: uuid.UUID = Field(
-        foreign_key="gdrivedatasource.id", nullable=False, ondelete="CASCADE"
+        foreign_key="gdrive_datasource.id", nullable=False, ondelete="CASCADE"
     )
     user_id: uuid.UUID  # denormalized
     chunk_index: int
