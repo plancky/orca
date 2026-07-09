@@ -6,15 +6,15 @@ from sqlalchemy import select
 
 from backend.api.deps import CurrentUser, SessionDep
 from backend.db.models import SyncStatus
-from backend.workers.sync import sync_all_users
+from backend.workers.sync import sync_user
 
 router = APIRouter(prefix="/sync", tags=["sync"])
 
 
 @router.post("/trigger")
 async def trigger_sync(user: CurrentUser) -> dict:
-    """Enqueue sync for all users."""
-    await anyio.to_thread.run_sync(functools.partial(sync_all_users.delay))
+    """Enqueue a sync of the authenticated user's connected sources."""
+    await anyio.to_thread.run_sync(functools.partial(sync_user.delay, str(user.id)))
     return {"status": "enqueued"}
 
 
