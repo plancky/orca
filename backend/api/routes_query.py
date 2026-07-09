@@ -128,6 +128,18 @@ async def submit_query(
         session.add(conv)
         await session.flush()
         conv_id = conv.id
+    else:
+        existing = await session.get(Conversation, conv_id)
+        if existing is None:
+            title = req.query[:80] if req.query else "New Conversation"
+            conv = Conversation(id=conv_id, user_id=u_id, title=title)
+            session.add(conv)
+            await session.flush()
+        elif existing.user_id != u_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Conversation belongs to another user.",
+            )
 
     task = Task(
         user_id=u_id,

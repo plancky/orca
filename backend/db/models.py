@@ -134,6 +134,7 @@ class Conversation(ConversationBase, table=True):
 class ConversationPublic(ConversationBase):
     id: uuid.UUID
     created_at: datetime
+    updated_at: datetime
 
 
 class MessageBase(SQLModel):

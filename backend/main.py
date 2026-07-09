@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from backend.api import (
     routes_auth,
+    routes_conversations,
     routes_login,
     routes_query,
     routes_sync,
@@ -40,6 +41,7 @@ def create_app() -> FastAPI:
     app.include_router(routes_query.router, prefix=prefix)
     app.include_router(routes_tasks.router, prefix=prefix)
     app.include_router(routes_sync.router, prefix=prefix)
+    app.include_router(routes_conversations.router, prefix=prefix)
     app.include_router(ws.router)  # WS has its own path /ws/query
 
     @app.get("/health", tags=["health"])
