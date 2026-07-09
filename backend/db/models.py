@@ -99,6 +99,9 @@ class User(UserBase, table=True):
     hashed_password: str
     google_access_token: str | None = None
     google_refresh_token: str | None = None
+    token_expiry: datetime | None = Field(default=None, sa_type=_TS)
+    token_scopes: list[str] | None = Field(default=None, sa_type=JSONB)
+    auth_status: str | None = Field(default="valid")
     created_at: datetime = Field(default_factory=_utcnow, sa_type=_TS)
 
 

@@ -87,6 +87,7 @@ sample queries** with expected outputs are in
 
 - **Docker** + Docker Compose (Postgres/pgvector + Redis + API + worker + beat)
 - **[uv](https://docs.astral.sh/uv/)** (for host-side migrations, seeding, tests)
+- **Node 20+ and npm** (only for the frontend SPA — see [`frontend/README.md`](frontend/README.md))
 
 ### 1 · Configure environment
 
@@ -145,7 +146,22 @@ TASK=$(curl -s -XPOST localhost:8000/api/v1/query \
 curl -s localhost:8000/api/v1/tasks/$TASK -H "authorization: Bearer $TOKEN" | python -m json.tool
 ```
 
-### 5 · (optional) Retrieval evaluation
+### 5 · Run the frontend
+
+A React Router v7 chat SPA (message thread, server-backed conversation history,
+Gmail/Calendar/Drive sync status) lives in [`frontend/`](frontend/) and talks to
+the API at `http://localhost:8000` (set in `frontend/.env`). With the backend up:
+
+```bash
+cd frontend
+npm install
+npm run dev                   # Vite dev server + HMR at http://localhost:5173
+```
+
+Build, typecheck, and Cloudflare Workers deploy are documented in
+[`frontend/README.md`](frontend/README.md).
+
+### 6 · (optional) Retrieval evaluation
 
 ```bash
 uv run python -m backend.eval.evaluate        # in-process Precision@5 + per-query latency
@@ -287,10 +303,13 @@ backend/
   synth/ synthesizer.py   aggregate node outputs → TaskResult
   context/ features/      conversation context · conflict detection
   workers/                celery_app · orchestrate · confirm · sync (15-min beat)
-  api/                    routes_{query,tasks,login,users,auth,sync} · ws · deps
+  api/                    routes_{query,tasks,login,users,auth,sync,conversations} · ws · deps
   eval/                   golden set + in-process Precision@5 + latency
   scripts/                seed.py · seed_users.py · export_openapi.py
 tests/                    hermetic harness (FakeEmbedder + stub_llm + conftest)
+frontend/                 React Router v7 SPA (Vite · TanStack Query · shadcn/Tailwind v4)
+  app/                    routes · lib/{api,auth,chat,history} · components/{chat,history,status,ui}
+                          typed from openapi.json (npm run gen:api) — see frontend/README.md
 docker-compose.yml  Dockerfile  alembic.ini  openapi.json
 README.md  DESIGN.md  API.md  docs/sample_queries.md
 ```
@@ -301,10 +320,10 @@ README.md  DESIGN.md  API.md  docs/sample_queries.md
 
 **In:** the full async orchestration pipeline, hybrid pgvector search over a
 mock corpus, JWT auth + user management, the write-gate suspend/resume flow, the
-15-min sync+embed beat, and the three bonuses (conversation context, conflict
-detection, WebSocket progress).
+15-min sync+embed beat, the three bonuses (conversation context, conflict
+detection, WebSocket progress), the `GET /conversations` history endpoints, and a
+**React Router v7 SPA** frontend ([`frontend/`](frontend/)).
 
 **Out (by design):** real Google OAuth / `googleapiclient` (Phase 2 —
-`GET /auth/google` → `501`, `GoogleProvider` is a stub), a frontend SPA, and
-`GET /conversations` list endpoints. No `google-*` SDK, LangChain, or managed
-vector DB appears anywhere.
+`GET /auth/google` → `501`, `GoogleProvider` is a stub). No `google-*` SDK,
+LangChain, or managed vector DB appears anywhere.

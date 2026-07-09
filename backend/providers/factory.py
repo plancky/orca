@@ -20,4 +20,4 @@ def get_provider(
 ) -> Provider:
     if settings.PROVIDER == "mock":
         return MockProvider(session=session, user_id=user_id)
-    return GoogleProvider()
+    return GoogleProvider(session=session, user_id=user_id)

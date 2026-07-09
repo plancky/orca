@@ -70,6 +70,36 @@ class Settings(BaseSettings):
     PROVIDER: str = "mock"
     RATE_LIMIT_PER_USER_PER_HOUR: int = 100
 
+    # --- Phase 2: Google Workspace OAuth + sync (PROVIDER=google) ---
+    GOOGLE_CLIENT_ID: str = Field(default="")
+    GOOGLE_CLIENT_SECRET: str = Field(default="")
+    GOOGLE_REDIRECT_URI: str = Field(
+        default="http://localhost:5173/api/v1/auth/callback"
+    )
+    GOOGLE_AUTH_URI: str = Field(default="https://accounts.google.com/o/oauth2/auth")
+    GOOGLE_TOKEN_URI: str = Field(default="https://oauth2.googleapis.com/token")
+    # Space-separated at rest (env-safe); split on whitespace at use.
+    GOOGLE_SCOPES: str = Field(
+        default=(
+            "openid email "
+            "https://www.googleapis.com/auth/userinfo.email "
+            "https://www.googleapis.com/auth/gmail.modify "
+            "https://www.googleapis.com/auth/calendar.events "
+            "https://www.googleapis.com/auth/drive.readonly "
+            "https://www.googleapis.com/auth/drive.file"
+        )
+    )
+    # Fernet key for encrypting Google tokens at rest; required when PROVIDER=google.
+    TOKEN_ENCRYPTION_KEY: str = Field(default="")
+    # Writes are simulated unless explicitly disabled — safe by default.
+    DRY_RUN_WRITES: bool = Field(default=True)
+    SYNC_PAGE_SIZE: int = Field(default=100)
+    GMAIL_BATCH_SIZE: int = Field(default=50)
+    GOOGLE_UNITS_PER_SEC: int = Field(default=250)
+    # SPA origin the OAuth callback redirects back to (hands off the JWT in the
+    # URL fragment). Local dev = the Vite dev server; set to the deployed SPA.
+    FRONTEND_URL: str = Field(default="http://localhost:5173")
+
     @model_validator(mode="after")
     def check_secret_key(self) -> "Settings":
         if not self.SECRET_KEY and not os.getenv("TESTING"):
