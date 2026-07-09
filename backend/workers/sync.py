@@ -7,7 +7,7 @@ import asyncio
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 
 from backend.config import settings
 from backend.db.models import (
@@ -95,6 +95,15 @@ async def _delete_removed(session, ds_model, key_field, uid, removals) -> None:
     )
 
 
+async def _count_datasource(session, ds_model, uid) -> int:
+    """Total rows the user currently has, not this run's delta upserts."""
+    return (
+        await session.execute(
+            select(func.count()).select_from(ds_model).where(ds_model.user_id == uid)
+        )
+    ).scalar_one()
+
+
 async def _write_status(session, uid, service, now, count, cursor) -> None:
     row = (
         await session.execute(
@@ -156,11 +165,12 @@ async def sync_all_async(user_id: str) -> dict:
                 if removals:
                     await _delete_removed(session, ds_model, key_field, uid, removals)
 
-                await _write_status(session, uid, service, now, len(upserts), cursor)
+                total = await _count_datasource(session, ds_model, uid)
+                await _write_status(session, uid, service, now, total, cursor)
                 await session.commit()
                 status_updates[service] = {
                     "last_synced_at": now.isoformat(),
-                    "item_count": len(upserts),
+                    "item_count": total,
                 }
             except Exception as exc:
                 await session.rollback()

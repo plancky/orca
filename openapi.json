@@ -482,7 +482,7 @@
           "sync"
         ],
         "summary": "Trigger Sync",
-        "description": "Enqueue sync for all users.",
+        "description": "Enqueue a sync of the authenticated user's connected sources.",
         "operationId": "trigger_sync_api_v1_sync_trigger_post",
         "responses": {
           "200": {
@@ -904,8 +904,11 @@
           "actions_taken": {
             "anyOf": [
               {
-                "additionalProperties": true,
-                "type": "object"
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
               },
               {
                 "type": "null"
@@ -916,8 +919,11 @@
           "pending_actions": {
             "anyOf": [
               {
-                "additionalProperties": true,
-                "type": "object"
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
               },
               {
                 "type": "null"

@@ -160,8 +160,8 @@ class Message(MessageBase, table=True):
     classification: dict[str, Any] | None = Field(default=None, sa_type=JSONB)
     entities: dict[str, Any] | None = Field(default=None, sa_type=JSONB)
     plan: dict[str, Any] | None = Field(default=None, sa_type=JSONB)
-    actions_taken: dict[str, Any] | None = Field(default=None, sa_type=JSONB)
-    pending_actions: dict[str, Any] | None = Field(default=None, sa_type=JSONB)
+    actions_taken: list[dict[str, Any]] | None = Field(default=None, sa_type=JSONB)
+    pending_actions: list[dict[str, Any]] | None = Field(default=None, sa_type=JSONB)
     created_at: datetime = Field(default_factory=_utcnow, sa_type=_TS)
     conversation: Conversation = Relationship(
         back_populates="messages",
@@ -179,8 +179,8 @@ class MessagePublic(MessageBase):
     classification: dict[str, Any] | None = None
     entities: dict[str, Any] | None = None
     plan: dict[str, Any] | None = None
-    actions_taken: dict[str, Any] | None = None
-    pending_actions: dict[str, Any] | None = None
+    actions_taken: list[dict[str, Any]] | None = None
+    pending_actions: list[dict[str, Any]] | None = None
 
 
 class ConversationWithMessages(ConversationPublic):

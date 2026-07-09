@@ -1,8 +1,10 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router";
 
 import { MessageInput } from "~/components/chat/MessageInput";
 import { MessageThread } from "~/components/chat/MessageThread";
+import { $api } from "~/lib/api/query";
 import { type Decision, useConfirmAction } from "~/lib/chat/useConfirmAction";
 import { useConversation } from "~/lib/chat/useConversation";
 import { useSendQuery } from "~/lib/chat/useSendQuery";
@@ -13,6 +15,7 @@ export default function ConversationRoute() {
   const params = useParams();
   const convId = params.conversationId ?? "";
 
+  const queryClient = useQueryClient();
   const conv = useConversation(convId);
   const { send } = useSendQuery();
   const { confirm } = useConfirmAction();
@@ -52,8 +55,14 @@ export default function ConversationRoute() {
         },
       ]);
       setTaskId(null);
+      // The worker just persisted this turn — re-validate so it survives a reload.
+      void queryClient.invalidateQueries({
+        queryKey: $api.queryOptions("get", "/api/v1/conversations/{conversation_id}", {
+          params: { path: { conversation_id: convId } },
+        }).queryKey,
+      });
     }
-  }, [status, result, taskId]);
+  }, [status, result, taskId, convId, queryClient]);
 
   const serverTurns: Turn[] = useMemo(() => {
     const msgs = conv.data?.messages ?? [];
@@ -64,9 +73,14 @@ export default function ConversationRoute() {
     }));
   }, [conv.data]);
 
-  const turns = [...serverTurns, ...localTurns];
+  // Dedup against server history so a folded exchange doesn't render twice.
+  const pendingLocalTurns = localTurns.filter(
+    (lt) => !serverTurns.some((st) => st.role === lt.role && st.content === lt.content),
+  );
+  const turns = [...serverTurns, ...pendingLocalTurns];
   const busy = taskId !== null && status !== "failed";
   const live = taskId !== null ? { status, result, progress } : null;
+  const isEmpty = turns.length === 0 && !live;
 
   async function onSend(text: string) {
     setLastQuery(text);
@@ -89,13 +103,15 @@ export default function ConversationRoute() {
 
   return (
     <div className="flex h-full flex-col">
-      <MessageThread
-        turns={turns}
-        live={live}
-        onDecision={onDecision}
-        onRetry={onRetry}
-      />
-      <MessageInput onSend={onSend} disabled={busy} />
+      {isEmpty ? null : (
+        <MessageThread
+          turns={turns}
+          live={live}
+          onDecision={onDecision}
+          onRetry={onRetry}
+        />
+      )}
+      <MessageInput onSend={onSend} disabled={busy} centered={isEmpty} />
     </div>
   );
 }

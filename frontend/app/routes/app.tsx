@@ -21,7 +21,7 @@ export default function AppLayout() {
       <div className="flex h-screen flex-col">
         <header className="flex items-center justify-between gap-4 border-b px-4 py-2">
           <div className="flex items-center gap-4">
-            <span className="font-semibold">Workspace Orchestrator</span>
+            <span className="font-semibold">Orca</span>
             <StatusBar />
           </div>
           <Button variant="ghost" size="sm" onClick={onLogout}>

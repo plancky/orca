@@ -41,7 +41,7 @@ export default function Login() {
       <Card className="w-full max-w-sm">
         <CardHeader>
           <CardTitle>Sign in</CardTitle>
-          <CardDescription>Agentic Workspace Orchestrator</CardDescription>
+          <CardDescription>Orca</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={onSubmit} className="flex flex-col gap-4">
