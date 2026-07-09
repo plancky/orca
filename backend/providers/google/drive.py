@@ -9,7 +9,7 @@ to text/plain, text files fetched, other binaries kept name-only (size-capped).
 Google stack.
 """
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from backend.config import settings
 
@@ -74,11 +74,13 @@ def _full(client) -> tuple[list[dict], list[str], str | None]:
     upserts: list[dict] = []
     page_token = None
     cap = settings.SYNC_PAGE_SIZE * 5
+    cutoff = datetime.now(timezone.utc) - timedelta(days=settings.SYNC_LOOKBACK_DAYS)
+    query = f"trashed=false and modifiedTime > '{cutoff.isoformat()}'"
     while True:
         resp = (
             client.files()
             .list(
-                q="trashed=false",
+                q=query,
                 orderBy="modifiedTime desc",
                 pageSize=settings.SYNC_PAGE_SIZE,
                 pageToken=page_token,

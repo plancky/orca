@@ -79,12 +79,14 @@ def _full(client) -> tuple[list[dict], list[str], str | None]:
     upserts: list[dict] = []
     page_token = None
     cap = settings.SYNC_PAGE_SIZE * 5
+    query = f"newer_than:{settings.SYNC_LOOKBACK_DAYS}d"
     while True:
         resp = (
             client.users()
             .messages()
             .list(
                 userId=_USER,
+                q=query,
                 maxResults=settings.SYNC_PAGE_SIZE,
                 pageToken=page_token,
             )
