@@ -5,7 +5,8 @@ beat, uncached) and the inline hot query path (``embed_query``, Redis-cached).
 
 * ``settings.EMBED_MODE == "fake"`` -> the deterministic ``FakeEmbedder`` (no
   network, reproducible cosine ordering offline).
-* otherwise -> Gemini via ``llm_client.embed`` over the OpenAI-compat REST.
+* otherwise -> the Modal-hosted BGE service (``ModalBGEEmbedder``) when
+  ``EMBEDDER_BASE_URL`` is set, else Gemini via ``llm_client.embed``.
 
 The BGE query-instruction prefix is BGE-specific and OFF for Gemini: it is
 applied only when ``settings.EMBED_QUERY_PREFIX`` is non-empty, so query and
@@ -21,6 +22,8 @@ import redis.asyncio as aioredis
 from redis.exceptions import RedisError
 
 from backend.config import settings
+from backend.embeddings.base import EmbeddingProvider
+from backend.embeddings.modal_bge import ModalBGEEmbedder
 from backend.llm.client import llm_client
 from backend.testing.fakes import FakeEmbedder
 
@@ -38,8 +41,16 @@ class Embedder:
     def __init__(self) -> None:
         self._fake = FakeEmbedder(settings.EMBED_DIM)
         self._redis: aioredis.Redis | None = None
+        self._provider: EmbeddingProvider | None = None
 
     # -- internals -------------------------------------------------------- #
+    def _real_provider(self) -> EmbeddingProvider | None:
+        if not settings.EMBEDDER_BASE_URL:
+            return None
+        if self._provider is None:
+            self._provider = ModalBGEEmbedder()
+        return self._provider
+
     def _redis_client(self) -> aioredis.Redis:
         if self._redis is None:
             # bytes in/out (decode_responses=False) — vectors are JSON blobs.
@@ -91,22 +102,30 @@ class Embedder:
         cached = await self._cache_get(key)
         if cached is not None:
             return cached
-        vector = (await self.embed_texts([self._apply_prefix(text)]))[0]
+        instruction = settings.EMBEDDER_QUERY_INSTRUCTION or None
+        vector = (
+            await self.embed_texts([self._apply_prefix(text)], instruction=instruction)
+        )[0]
         await self._cache_set(key, vector)
         return vector
 
-    async def embed_texts(self, texts: list[str]) -> list[list[float]]:
+    async def embed_texts(
+        self, texts: list[str], instruction: str | None = None
+    ) -> list[list[float]]:
         """Embed a batch of texts (corpus path — never cached).
 
-        Fake mode returns deterministic offline vectors; real mode calls Gemini
-        in batches of ``GEMINI_EMBED_BATCH_SIZE``. Vectors are produced at
-        ``settings.EMBED_DIM`` — the client applies that dimension internally
-        against its frozen ``embed(texts)`` signature.
+        Fake mode returns deterministic offline vectors; real mode routes to the
+        Modal BGE service (``ModalBGEEmbedder``) when ``EMBEDDER_BASE_URL`` is
+        set, else falls back to Gemini via ``llm_client.embed``. ``instruction``
+        is the BGE query-side retrieval instruction (``None`` for documents).
         """
         if not texts:
             return []
         if settings.EMBED_MODE == "fake":
             return await self._fake.embed_texts(texts)
+        provider = self._real_provider()
+        if provider is not None:
+            return await provider.embed(texts, instruction=instruction)
         vectors: list[list[float]] = []
         for batch in _batched(texts, settings.GEMINI_EMBED_BATCH_SIZE):
             vectors.extend(await llm_client.embed(batch))

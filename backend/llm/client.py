@@ -16,6 +16,8 @@ from typing import Any
 import httpx
 
 from backend.config import settings
+from backend.llm.base import LLMProvider
+from backend.llm.modal_qwen import ModalQwenAdapter
 
 _RETRY_STATUS = frozenset({429, 503})
 _BACKOFF_BASE_SECONDS = 0.5
@@ -23,7 +25,7 @@ _BACKOFF_MAX_SECONDS = 60.0
 _REQUEST_TIMEOUT = httpx.Timeout(60.0, connect=10.0)
 
 
-class LLMClient:
+class LLMClient(LLMProvider):
     """Holds one shared `httpx.AsyncClient` for chat + embedding calls."""
 
     def __init__(self, client: httpx.AsyncClient | None = None) -> None:
@@ -122,4 +124,18 @@ def _parse_retry_after(value: str | None) -> float | None:
     return max((when - datetime.now(when.tzinfo)).total_seconds(), 0.0)
 
 
-llm_client = LLMClient()
+def _build_llm_client() -> LLMProvider:
+    provider = settings.LLM_PROVIDER.strip().lower()
+    if provider == "auto":
+        provider = "modal_qwen" if settings.LLM_BASE_URL else "gemini"
+    if provider in {"modal_qwen", "modal", "qwen"}:
+        return ModalQwenAdapter()
+    if provider in {"gemini", "google"}:
+        return LLMClient()
+    raise ValueError(
+        f"Unknown LLM_PROVIDER={settings.LLM_PROVIDER!r} "
+        "(expected auto|modal_qwen|gemini)"
+    )
+
+
+llm_client: LLMProvider = _build_llm_client()
