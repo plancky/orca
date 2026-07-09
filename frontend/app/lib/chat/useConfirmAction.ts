@@ -1,3 +1,5 @@
+import { useQueryClient } from "@tanstack/react-query";
+
 import { $api } from "~/lib/api/query";
 
 export type Decision = "approved" | "denied";
@@ -7,7 +9,14 @@ export type Decision = "approved" | "denied";
  * a NEW task_id (parent_task_id set) that the caller polls the same way.
  */
 export function useConfirmAction() {
-  const mutation = $api.useMutation("post", "/api/v1/query");
+  const queryClient = useQueryClient();
+  const mutation = $api.useMutation("post", "/api/v1/query", {
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: $api.queryOptions("get", "/api/v1/conversations").queryKey,
+      });
+    },
+  });
 
   function confirm(
     conversationId: string,

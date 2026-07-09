@@ -1,4 +1,5 @@
 import { Bot, User as UserIcon } from "lucide-react";
+import { Streamdown } from "streamdown";
 
 import { Avatar, AvatarFallback } from "~/components/ui/avatar";
 import { Button } from "~/components/ui/button";
@@ -9,6 +10,12 @@ import type { Decision } from "~/lib/chat/useConfirmAction";
 import type { Turn } from "~/lib/chat/types";
 import { PendingActionCard } from "./PendingActionCard";
 import { ProgressTrace } from "./ProgressTrace";
+
+const markdownComponents = {
+  a: (props: React.ComponentProps<"a">) => (
+    <a {...props} target="_blank" rel="noreferrer" />
+  ),
+};
 
 export interface LiveState {
   status: string | undefined;
@@ -37,7 +44,16 @@ function TurnBubble({ turn }: { turn: Turn }) {
             isUser ? "bg-primary text-primary-foreground" : ""
           }`}
         >
-          <div className="whitespace-pre-wrap">{turn.content}</div>
+          {isUser ? (
+            <div className="whitespace-pre-wrap">{turn.content}</div>
+          ) : (
+            <Streamdown
+              className="max-w-none text-sm [&_pre]:overflow-x-auto"
+              components={markdownComponents}
+            >
+              {turn.content}
+            </Streamdown>
+          )}
           {turn.actions && turn.actions.length > 0 ? (
             <div className="mt-1 text-xs opacity-70">
               {turn.actions.map((a, i) => (
@@ -90,7 +106,14 @@ function LiveBubble({
     return (
       <AssistantShell>
         {live.result?.response ? (
-          <Card className="px-3 py-2 text-sm">{live.result.response}</Card>
+          <Card className="px-3 py-2 text-sm">
+            <Streamdown
+              className="max-w-none text-sm [&_pre]:overflow-x-auto"
+              components={markdownComponents}
+            >
+              {live.result.response}
+            </Streamdown>
+          </Card>
         ) : null}
         {(live.result?.pending_actions ?? []).map((a) => (
           <PendingActionCard

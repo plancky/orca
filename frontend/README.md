@@ -1,7 +1,7 @@
-# Workspace Orchestrator — Frontend
+# Orca — Frontend
 
 A React Router v7 SPA (framework mode, `ssr: false`) for the Agentic Google
-Workspace Orchestrator backend. Text-only chat over an async, poll-based task
+Orca backend. Text-only chat over an async, poll-based task
 API, with a server-backed conversation history panel and a Gmail/Calendar/Drive
 sync status bar. End-to-end typed from the backend's `openapi.json`; all UI is
 shadcn/ui on Tailwind v4. Deploys as static assets to Cloudflare Workers.

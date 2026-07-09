@@ -1,4 +1,4 @@
-# Agentic Google Workspace Orchestrator
+# Orca
 
 An async orchestrator that answers natural-language questions across **Gmail,
 Google Calendar, and Google Drive**. It classifies intent, plans an execution

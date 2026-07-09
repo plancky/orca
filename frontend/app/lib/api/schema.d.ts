@@ -171,7 +171,7 @@ export interface paths {
         put?: never;
         /**
          * Trigger Sync
-         * @description Enqueue sync for all users.
+         * @description Enqueue a sync of the authenticated user's connected sources.
          */
         post: operations["trigger_sync_api_v1_sync_trigger_post"];
         delete?: never;
@@ -389,11 +389,11 @@ export interface components {
             /** Actions Taken */
             actions_taken?: {
                 [key: string]: unknown;
-            } | null;
+            }[] | null;
             /** Pending Actions */
             pending_actions?: {
                 [key: string]: unknown;
-            } | null;
+            }[] | null;
         };
         /** QueryRequest */
         QueryRequest: {
