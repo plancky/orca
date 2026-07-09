@@ -26,7 +26,7 @@ from backend.db.models import (
     GDriveDatasource,
     GmailDatasource,
 )
-from backend.embeddings.search import hybrid_search
+from backend.embeddings.search import filter_search, hybrid_search
 from backend.testing.fakes import FakeEmbedder
 
 # service token -> (datasource model, business-id column). "drive"/"gdrive" and
@@ -74,6 +74,14 @@ class MockProvider(Provider):
             for k, v in filters.items()
             if not k.startswith("_") and k not in ("session", "user_id")
         }
+        if not (query and query.strip()):
+            return await filter_search(
+                self._require_session(),
+                service,
+                str(self._require_user()),
+                filters=metadata or None,
+                top_k=top_k,
+            )
         q_embedding = await FakeEmbedder().embed_query(query, user_id=self.user_id)
         return await hybrid_search(
             self._require_session(),

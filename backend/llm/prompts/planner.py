@@ -47,6 +47,18 @@ RULES:
 - chained nodes carry `depends_on: ["nX"]` where "nX" is the upstream node ID
 - deferred args use `"$nX.field"` (e.g. `"$n1.booking_ref"`)
 - USE ONLY TOOLS FROM THE PROVIDED CATALOG. Do NOT hallucinate tools.
+
+SEARCH TOOL ARGS (search_emails / search_events / search_files):
+- `query` is SEMANTIC text — include it ONLY when the user is searching by topic
+  or content (e.g. "emails about the budget"). If the request is purely a
+  time/metadata filter (e.g. "my meetings last week", "files I changed
+  yesterday"), OMIT `query` entirely — do NOT pass an empty string. An absent
+  `query` runs a plain filtered/sorted lookup instead of a semantic search.
+- Put structured constraints in `filters`. When `entities.timeframe` is present
+  it is a resolved `{{"start": ISO, "end": ISO}}` range — pass it as the date
+  column for the service: gcal -> `start_at`, gmail -> `received_at`,
+  drive -> `modified_at`. Example args:
+  `{{"filters": {{"start_at": {{"start": "...", "end": "..."}}}}}}`
 """
 
     user = f"""INTENT: {intent.model_dump_json(indent=2)}

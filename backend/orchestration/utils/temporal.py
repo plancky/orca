@@ -31,6 +31,11 @@ def resolve_timeframe(
         start_dt = datetime.combine(next_monday, time.min, tzinfo=tz)
         end_dt = datetime.combine(next_sunday, time.max, tzinfo=tz)
 
+    elif "last week" in phrase or "past week" in phrase:
+        # Rolling trailing 7 days (not the prior calendar week) — "in the last week"
+        start_dt = datetime.combine(today - timedelta(days=7), time.min, tzinfo=tz)
+        end_dt = datetime.combine(today, time.max, tzinfo=tz)
+
     elif "last month" in phrase:
         # 1st of last month to last day of last month
         first_day_of_this_month = today.replace(day=1)

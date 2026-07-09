@@ -74,6 +74,22 @@ def _as_uuid(value: str | uuid.UUID) -> uuid.UUID:
     return value if isinstance(value, uuid.UUID) else uuid.UUID(str(value))
 
 
+def _coerce_temporal(value: Any) -> Any:
+    """ISO-8601 string -> ``datetime`` so asyncpg can bind a ``timestamptz`` param.
+
+    Every ``range`` filter column is a timestamp, and the planner's resolved
+    timeframe supplies ``.isoformat()`` strings — but asyncpg binds ``timestamptz``
+    from ``datetime`` only and raises ``DataError`` on a ``str``. Non-string or
+    unparseable values pass through untouched.
+    """
+    if not isinstance(value, str):
+        return value
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return value
+
+
 def _build_filter_sql(
     service: str, filters: dict[str, Any] | None
 ) -> tuple[list[str], dict[str, Any]]:
@@ -95,12 +111,12 @@ def _build_filter_sql(
         if key.endswith("_after") and spec.get(key[:-6]) == "range":
             col, pname = key[:-6], f"f_{key}"
             clauses.append(f"ds.{col} >= :{pname}")
-            params[pname] = value
+            params[pname] = _coerce_temporal(value)
             continue
         if key.endswith("_before") and spec.get(key[:-7]) == "range":
             col, pname = key[:-7], f"f_{key}"
             clauses.append(f"ds.{col} <= :{pname}")
-            params[pname] = value
+            params[pname] = _coerce_temporal(value)
             continue
 
         kind = spec.get(key)
@@ -110,13 +126,13 @@ def _build_filter_sql(
         elif kind == "range" and isinstance(value, dict):
             if value.get("start") is not None:
                 clauses.append(f"ds.{key} >= :f_{key}_start")
-                params[f"f_{key}_start"] = value["start"]
+                params[f"f_{key}_start"] = _coerce_temporal(value["start"])
             if value.get("end") is not None:
                 clauses.append(f"ds.{key} <= :f_{key}_end")
-                params[f"f_{key}_end"] = value["end"]
+                params[f"f_{key}_end"] = _coerce_temporal(value["end"])
         elif kind == "range":
             clauses.append(f"ds.{key} = :f_{key}")
-            params[f"f_{key}"] = value
+            params[f"f_{key}"] = _coerce_temporal(value)
         elif kind == "array":
             vals = list(value) if isinstance(value, (list, tuple, set)) else [value]
             clauses.append(f"ds.{key} && :f_{key}")  # postgres array overlap
@@ -190,3 +206,54 @@ async def hybrid_search(
     # recency-decayed similarity (stable, deterministic given fixed inputs).
     items.sort(key=lambda it: it["score"], reverse=True)
     return items[:top_k]
+
+
+async def filter_search(
+    session: AsyncSession,
+    service: str,
+    user_id: str,
+    filters: dict | None = None,
+    top_k: int = 10,
+) -> list[dict]:
+    """Filter-and-sort over a datasource table — no embedding, no vector store.
+
+    The path for queries with no semantic term (e.g. "meetings last week"): there
+    is nothing to rank by relevance, so we skip the embedder and the
+    ``*_vector_store`` entirely and read ``*_datasource`` directly under the user
+    scope + the same metadata filters ``hybrid_search`` accepts (date ranges,
+    scalars, arrays), ordered by the service's recency column (newest first).
+
+    Returns datasource-level items shaped like ``hybrid_search`` (``datasource_id``
+    + a ``score``), with ``distance``/``similarity`` set to ``None`` because no
+    cosine ranking took place. ``score`` is the recency multiplier alone, so
+    downstream ordering stays consistent.
+    """
+    if service not in _SERVICES:
+        raise ValueError(f"unknown service: {service!r}")
+    _vs_table, ds_table, recency_col = _SERVICES[service]
+
+    filter_clauses, filter_params = _build_filter_sql(service, filters)
+    where_sql = " AND ".join(["ds.user_id = :uid", *filter_clauses])
+    sql = text(
+        f"SELECT ds.* FROM {ds_table} ds "
+        f"WHERE {where_sql} "
+        f"ORDER BY ds.{recency_col} DESC NULLS LAST "
+        f"LIMIT :limit"
+    )
+    params: dict[str, Any] = {
+        "uid": _as_uuid(user_id),
+        "limit": top_k,
+        **filter_params,
+    }
+    rows = (await session.execute(sql, params)).mappings().all()
+
+    now = datetime.now(timezone.utc)
+    items: list[dict] = []
+    for row in rows:
+        item = dict(row)
+        item["datasource_id"] = item.get("id")
+        item["distance"] = None
+        item["similarity"] = None
+        item["score"] = _recency_multiplier(item.get(recency_col), now)
+        items.append(item)
+    return items

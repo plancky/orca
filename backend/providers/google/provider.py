@@ -21,7 +21,7 @@ from backend.agents.base import Provider
 from backend.config import settings
 from backend.db.models import ActionsLog, ActionStatus
 from backend.embeddings.embedder import embedder
-from backend.embeddings.search import hybrid_search
+from backend.embeddings.search import filter_search, hybrid_search
 from backend.providers.google import drive, gcal, gmail
 
 _ADAPTERS = {"gmail": gmail, "gcal": gcal, "gdrive": drive}
@@ -78,11 +78,22 @@ class GoogleProvider(Provider):
             for k, v in filters.items()
             if not k.startswith("_") and k not in ("session", "user_id")
         }
+        service = normalize_service(service)
+        # Empty query -> filter+sort the datasource; the BGE /embed service 422s
+        # on an empty string, and there is nothing to rank by relevance anyway.
+        if not (query and query.strip()):
+            return await filter_search(
+                self._require_session(),
+                service,
+                str(self._require_user()),
+                filters=metadata or None,
+                top_k=top_k,
+            )
         q_embedding = await embedder.embed_query(query, user_id=self.user_id)
         return await hybrid_search(
             self._require_session(),
             q_embedding,
-            normalize_service(service),
+            service,
             str(self._require_user()),
             filters=metadata or None,
             top_k=top_k,
