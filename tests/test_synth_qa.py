@@ -1,5 +1,6 @@
 import json
 import uuid
+from datetime import datetime, timezone
 
 import pytest
 
@@ -85,3 +86,22 @@ async def test_synth_degraded_path(stub_llm_factory):
     assert isinstance(result, TaskResult)
     assert "Gmail search failed" in result.response
     assert len(result.actions_taken) == 1
+
+
+async def test_synth_serializes_uuid_and_datetime_node_outputs(stub_llm_factory):
+    stub_llm_factory(json.dumps({"response": "ok", "actions_taken": []}))
+
+    intent = Intent(services=["gmail"], intent="find")
+    node_outputs = {
+        "n1": {
+            "id": uuid.uuid4(),
+            "datasource_id": uuid.uuid4(),
+            "received_at": datetime(2024, 3, 10, 12, 0, tzinfo=timezone.utc),
+            "subject": "hi",
+        }
+    }
+
+    result = await synthesize(intent, node_outputs, None, llm_client=llm_client)
+
+    assert isinstance(result, TaskResult)
+    assert isinstance(result.response, str) and len(result.response) > 0

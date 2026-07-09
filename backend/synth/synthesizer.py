@@ -41,12 +41,13 @@ async def synthesize(
             "role": "user",
             "content": json.dumps(
                 {
-                    "intent": intent.model_dump(),
+                    "intent": intent.model_dump(mode="json"),
                     "node_outputs": node_outputs,
                     "pending_actions": [
                         p.model_dump(mode="json") for p in (pending_actions or [])
                     ],
-                }
+                },
+                default=str,
             ),
         },
     ]
