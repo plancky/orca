@@ -33,6 +33,30 @@ class Settings(BaseSettings):
     GEMINI_EMBED_BATCH_SIZE: int = 32
     GEMINI_MAX_RETRIES: int = 5
 
+    # --- Pluggable chat-inference provider (Adapter pattern) ---
+    # "auto" -> Modal/Qwen when LLM_BASE_URL set, else Gemini; or force by name.
+    LLM_PROVIDER: str = Field(default="auto")
+    # Modal endpoint incl. version segment, e.g. https://<app>.modal.direct/v1
+    LLM_BASE_URL: str = Field(default="")
+    # OpenAI SDK needs a non-empty key; Modal auth rides on headers.
+    LLM_API_KEY: str = Field(default="unused")
+    LLM_MODEL: str = Field(default="Qwen/Qwen3.6-35B-A3B")
+    LLM_MAX_TOKENS: int = Field(default=2048)
+    # "none" keeps Qwen3 JSON-mode output free of think traces.
+    LLM_REASONING_EFFORT: str = Field(default="none")
+    # sent as Modal-Key / Modal-Secret headers on every request.
+    MODAL_PROXY_TOKEN_ID: str = Field(default="")
+    MODAL_PROXY_TOKEN_SECRET: str = Field(default="")
+
+    # --- Embeddings: Modal-hosted BGE service (Adapter pattern) ---
+    # Separate service from the chat LLM; reuses the same MODAL_PROXY_TOKEN_* pair.
+    # Set (with EMBED_MODE=real) to route real embeddings to the BGE /embed API.
+    EMBEDDER_BASE_URL: str = Field(default="")
+    # BGE retrieval instruction for the QUERY side; documents embed with None.
+    EMBEDDER_QUERY_INSTRUCTION: str = Field(
+        default="Represent this sentence for searching relevant passages:"
+    )
+
     SYNC_BEAT_MINUTES: int = 15
 
     SECRET_KEY: str = Field(default="")
