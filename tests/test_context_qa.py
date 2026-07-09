@@ -1,15 +1,20 @@
 import json
 import uuid
+from datetime import datetime, timezone
 
 import pytest
+from sqlalchemy import select
 
 from backend.context.conversation import (
     _get_redis,
     append_turn_messages,
     get_conversation_context,
 )
-from backend.db.models import Conversation, Message, MessageRole, User
+from backend.db.models import Conversation, Message, MessageRole, Task, User
 from backend.db.session import async_session_factory
+from backend.llm.client import llm_client
+from backend.orchestration.models.intent import Intent
+from backend.synth.synthesizer import synthesize
 
 
 @pytest.mark.asyncio
@@ -159,3 +164,53 @@ async def test_context_injection_in_classifier(monkeypatch):
 
     assert "Here is the proposal email." in messages_captured[0]["content"]
     assert intent.needs_clarification is False
+
+
+@pytest.mark.asyncio
+async def test_query_turn_persists_messages_with_uuid_node_outputs(stub_llm_factory):
+    import backend.context.conversation as conv_module
+
+    conv_module._redis_client = None
+    stub_llm_factory(json.dumps({"response": "ok", "actions_taken": []}))
+
+    async with async_session_factory() as session:
+        user = User(email=f"test_{uuid.uuid4().hex[:8]}@test.com", hashed_password="pw")
+        session.add(user)
+        await session.commit()
+        uid = user.id
+
+        cid = uuid.uuid4()
+        conv = Conversation(id=cid, user_id=uid)
+        session.add(conv)
+        await session.commit()
+
+        task_id = uuid.uuid4()
+        task = Task(id=task_id, user_id=uid, conversation_id=cid)
+        session.add(task)
+        await session.commit()
+
+        node_outputs = {
+            "n1": {
+                "id": uuid.uuid4(),
+                "received_at": datetime.now(timezone.utc),
+            }
+        }
+        intent = Intent(services=["gmail"], intent="find")
+
+        result = await synthesize(intent, node_outputs, None, llm_client=llm_client)
+
+        await append_turn_messages(
+            session,
+            cid,
+            uid,
+            "q",
+            result,
+            task_id,
+            intent=intent.model_dump(mode="json"),
+        )
+
+        rows = (
+            await session.execute(select(Message).where(Message.conversation_id == cid))
+        ).scalars().all()
+        assert {m.role for m in rows} == {"user", "assistant"}
+        assert len(rows) == 2
