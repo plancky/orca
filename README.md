@@ -19,7 +19,8 @@ with **no LangChain / LlamaIndex / agent framework** and **no managed vector DB*
 
 <p align="center">
   <img src="ss_2.png" alt="Orca sign-in screen" width="800"><br>
-  <img src="ss_1.png" alt="Orca chat interface" width="800">
+  <img src="ss_1.png" alt="Orca chat interface" width="800"><br>
+  <img src="ss_3.png" alt="Orca multi-turn conversation: calendar lookup followed by a drafted reschedule email" width="800">
 </p>
 
 ---
