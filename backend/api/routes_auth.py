@@ -157,9 +157,9 @@ async def google_callback(
 
     await creds_mod.store_credentials(session, user, creds)
 
-    from backend.workers.sync import sync_all_users
+    from backend.workers.sync import sync_user
 
-    sync_all_users.delay()
+    sync_user.delay(str(user.id))
 
     access_token = create_access_token(
         user.id, timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
