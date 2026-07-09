@@ -113,3 +113,39 @@ async def test_query_route_failure(user_fixture, monkeypatch):
     from backend.db.session import engine
 
     await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_query_route_client_minted_conversation_id(user_fixture, monkeypatch):
+    """A client-provided conversation_id that does not yet exist is created
+    (the SPA mints the UUID before the first turn)."""
+    from datetime import timedelta
+
+    from backend.core.security import create_access_token
+    from backend.workers.orchestrate import run_pipeline
+
+    monkeypatch.setattr(run_pipeline, "delay", lambda *args, **kwargs: None)
+    auth_token = create_access_token(
+        subject=str(user_fixture.id), expires_delta=timedelta(hours=1)
+    )
+    client_cid = str(uuid.uuid4())
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        resp = await client.post(
+            "/api/v1/query",
+            json={"query": "hello there", "conversation_id": client_cid},
+            headers={"Authorization": f"Bearer {auth_token}"},
+        )
+        assert resp.status_code == 202
+        assert resp.json()["conversation_id"] == client_cid
+
+        async with async_session_factory() as session:
+            conv = await session.get(Conversation, uuid.UUID(client_cid))
+            assert conv is not None
+            assert conv.user_id == user_fixture.id
+
+    from backend.db.session import engine
+
+    await engine.dispose()
