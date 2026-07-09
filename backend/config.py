@@ -67,7 +67,7 @@ class Settings(BaseSettings):
 
     API_V1_STR: str = "/api/v1"
     DEFAULT_TZ: str = "America/New_York"
-    PROVIDER: str = "mock"
+    PROVIDER: str = "google"
     RATE_LIMIT_PER_USER_PER_HOUR: int = 100
 
     # --- Phase 2: Google Workspace OAuth + sync (PROVIDER=google) ---
@@ -94,6 +94,9 @@ class Settings(BaseSettings):
     # Writes are simulated unless explicitly disabled — safe by default.
     DRY_RUN_WRITES: bool = Field(default=True)
     SYNC_PAGE_SIZE: int = Field(default=100)
+    # First (cursor-less) full sync window for Gmail/Drive; later passes are
+    # incremental (syncToken/historyId/pageToken) and ignore this.
+    SYNC_LOOKBACK_DAYS: int = Field(default=7)
     GMAIL_BATCH_SIZE: int = Field(default=50)
     GOOGLE_UNITS_PER_SEC: int = Field(default=250)
     # SPA origin the OAuth callback redirects back to (hands off the JWT in the

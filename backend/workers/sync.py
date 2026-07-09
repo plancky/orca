@@ -23,7 +23,6 @@ from backend.db.models import (
 from backend.db.session import async_session_factory
 from backend.embeddings.chunkers import chunk_gcal, chunk_gdrive, chunk_gmail
 from backend.embeddings.embedder import embedder
-from backend.providers.mock._corpus_data import build_corpus
 from backend.providers.mock.seed_corpus import (
     _chunk_or_fallback,
     _replace_chunks,
@@ -116,29 +115,27 @@ async def _write_status(session, uid, service, now, count, cursor) -> None:
 async def sync_all_async(user_id: str) -> dict:
     """Per-user sync: fetch -> upsert datasource -> chunk+embed -> replace chunks.
 
-    The mock corpus and the Google adapters both yield ``(upserts, removals,
-    cursor)``, so the chunk/embed/write path below is identical for both. Each
-    service is committed on its own and wrapped in a try/except: a failing
-    service (dead token, quota, embed error) is rolled back and recorded as an
-    error, without discarding the services that already succeeded in this pass.
+    Live-source only: a no-op unless ``PROVIDER=="google"``. The mock corpus is
+    seeded once via ``scripts/seed.py`` (``providers.mock.seed_corpus``) for the
+    demo/dev account, not repeatedly written into every active user's tables by
+    this worker. Each service commits on its own inside its own try/except: a
+    failing service (dead token, quota, embed error) rolls back without
+    discarding services that already succeeded in this pass.
     """
     uid = uuid.UUID(str(user_id))
+    if settings.PROVIDER != "google":
+        return {}
     status_updates: dict = {}
-    is_mock = settings.PROVIDER == "mock"
 
     async with async_session_factory() as session:
         now = datetime.now(timezone.utc)
-        corpus = build_corpus(now) if is_mock else None
 
         for service, ds_model, chunk_model, key_field in _SERVICES:
             try:
-                if corpus is not None:
-                    upserts, removals, cursor = corpus.get(service, []), [], None
-                else:
-                    stored = await _load_cursor(session, uid, service)
-                    upserts, removals, cursor = await _fetch_google(
-                        session, uid, service, stored
-                    )
+                stored = await _load_cursor(session, uid, service)
+                upserts, removals, cursor = await _fetch_google(
+                    session, uid, service, stored
+                )
 
                 for item in upserts:
                     ds = await _upsert_datasource(
@@ -177,23 +174,24 @@ async def sync_all_async(user_id: str) -> dict:
 def sync_user(user_id: str) -> dict:
     """On-demand sync of ONE user (POST /sync/trigger + the OAuth callback).
 
-    Pulls from the live Google APIs when ``PROVIDER=google``, else the mock corpus.
+    A no-op unless ``PROVIDER=="google"`` — see ``sync_all_async``.
     """
     return asyncio.run(sync_all_async(user_id))
 
 
 @app.task(name="backend.workers.sync.sync_all_users")
 def sync_all_users():
-    """Beat task: sync active users (Google: only connected, non-invalid)."""
+    """Beat task: sync active, Google-connected users. No-op for other providers."""
 
     async def _sync_active():
+        if settings.PROVIDER != "google":
+            return
         async with async_session_factory() as session:
-            stmt = select(User.id).where(User.is_active.is_(True))
-            if settings.PROVIDER != "mock":
-                stmt = stmt.where(
-                    User.google_refresh_token.is_not(None),
-                    User.auth_status.is_distinct_from("invalid"),
-                )
+            stmt = select(User.id).where(
+                User.is_active.is_(True),
+                User.google_refresh_token.is_not(None),
+                User.auth_status.is_distinct_from("invalid"),
+            )
             user_ids = (await session.execute(stmt)).scalars().all()
         # Per-user isolation: one dead token must not abort the rest of the pass.
         for uid in user_ids:
