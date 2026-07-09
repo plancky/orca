@@ -160,7 +160,7 @@ export function MessageThread({
 }) {
   const showLive = live && live.status && live.status !== "success";
   return (
-    <ScrollArea className="flex-1">
+    <ScrollArea className="min-h-0 flex-1">
       <div className="mx-auto flex max-w-2xl flex-col gap-4 p-4">
         {turns.length === 0 && !showLive ? (
           <p className="pt-8 text-center text-sm text-muted-foreground">
