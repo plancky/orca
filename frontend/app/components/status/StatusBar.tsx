@@ -24,7 +24,7 @@ export function StatusBar() {
   }
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center justify-end gap-2">
       {SERVICES.map((s) => (
         <ServicePill key={s} service={s} row={byService.get(s)} />
       ))}

@@ -15,6 +15,15 @@ LangChain / LlamaIndex / agent framework** and **no managed vector DB**.
 
 ---
 
+## Screenshots
+
+<p align="center">
+  <img src="ss_2.png" alt="Orca sign-in screen" width="800"><br>
+  <img src="ss_1.png" alt="Orca chat interface" width="800">
+</p>
+
+---
+
 ## What it does
 
 ```

@@ -1,5 +1,5 @@
-import { Plus } from "lucide-react";
-import { NavLink, useLocation } from "react-router";
+import { LogOut, Plus } from "lucide-react";
+import { NavLink, useLocation, useNavigate } from "react-router";
 
 import { Button } from "~/components/ui/button";
 import { ScrollArea } from "~/components/ui/scroll-area";
@@ -8,6 +8,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "~/components/ui/tooltip";
+import { useAuth } from "~/lib/auth/useAuth";
 import { useConversations } from "~/lib/history/useConversations";
 import { cn } from "~/lib/utils";
 
@@ -21,6 +22,13 @@ function truncateTitle(title: string) {
 export function ConversationList() {
   const { conversations, newConversation } = useConversations();
   const { pathname } = useLocation();
+  const { logout } = useAuth();
+  const navigate = useNavigate();
+
+  function onLogout() {
+    logout();
+    navigate("/login", { replace: true });
+  }
 
   return (
     <aside className="flex h-full w-64 shrink-0 flex-col border-r bg-sidebar">
@@ -64,6 +72,16 @@ export function ConversationList() {
           ) : null}
         </nav>
       </ScrollArea>
+      <div className="border-t p-2">
+        <Button
+          variant="ghost"
+          className="w-full justify-start gap-2"
+          onClick={onLogout}
+        >
+          <LogOut className="size-4" />
+          Logout
+        </Button>
+      </div>
     </aside>
   );
 }

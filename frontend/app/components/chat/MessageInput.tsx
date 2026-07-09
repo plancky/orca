@@ -37,6 +37,11 @@ export function MessageInput({
           : "border-t p-4"
       }
     >
+      {centered ? (
+        <h1 className="mb-6 font-serif text-4xl font-semibold tracking-wide">
+          Hi! Orca is at your service!
+        </h1>
+      ) : null}
       <div className="mx-auto flex w-full max-w-2xl items-end gap-2 pb-6">
         <Textarea
           value={text}
