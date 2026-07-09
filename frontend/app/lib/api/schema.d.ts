@@ -99,8 +99,25 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Google Oauth Stub */
-        get: operations["google_oauth_stub_api_v1_auth_google_get"];
+        /** Google Authorize */
+        get: operations["google_authorize_api_v1_auth_google_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Google Callback */
+        get: operations["google_callback_api_v1_auth_callback_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -670,7 +687,7 @@ export interface operations {
             };
         };
     };
-    google_oauth_stub_api_v1_auth_google_get: {
+    google_authorize_api_v1_auth_google_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -686,6 +703,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+        };
+    };
+    google_callback_api_v1_auth_callback_get: {
+        parameters: {
+            query: {
+                state: string;
+                code?: string | null;
+                error?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
