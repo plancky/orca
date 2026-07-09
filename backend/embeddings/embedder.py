@@ -109,6 +109,12 @@ class Embedder:
         await self._cache_set(key, vector)
         return vector
 
+    async def aclose(self) -> None:
+        if self._provider is not None:
+            await self._provider.aclose()
+        if self._redis is not None:
+            await self._redis.aclose()
+
     async def embed_texts(
         self, texts: list[str], instruction: str | None = None
     ) -> list[list[float]]:

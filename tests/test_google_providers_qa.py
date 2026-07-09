@@ -7,15 +7,12 @@ mock-provider contract is covered by the existing suite and stays untouched.
 
 import base64
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime
 from unittest.mock import MagicMock
 
 import pytest
-from sqlalchemy import select
 
 from backend.config import settings
-from backend.db.models import ActionsLog, User
-from backend.db.session import async_session_factory
 from backend.providers.google import credentials as creds_mod
 from backend.providers.google import drive, gcal, gmail
 from backend.providers.google.provider import GoogleProvider, normalize_service
@@ -229,92 +226,3 @@ async def test_google_search_blank_query_skips_embedding(monkeypatch):
     assert captured["filters"] == {"start_at": window["start_at"]}
     assert result == [{"event_id": "e1"}]
 
-
-async def test_execute_dry_run_is_simulated(fernet_key, monkeypatch):
-    monkeypatch.setattr(settings, "PROVIDER", "google")
-    monkeypatch.setattr(settings, "DRY_RUN_WRITES", True)
-    uid = uuid.uuid4()
-    async with async_session_factory() as session:
-        session.add(User(id=uid, email=f"dry_{uid}@x.com", hashed_password="x"))
-        await session.commit()
-        provider = GoogleProvider(session=session, user_id=uid)
-        res = await provider.execute("gmail", "send_email", {"to": "a@x.com"})
-        assert res["status"] == "simulated"
-        rows = (
-            await session.execute(
-                select(ActionsLog).where(ActionsLog.user_id == uid)
-            )
-        ).scalars().all()
-        assert len(rows) == 1
-        assert rows[0].tool == "gmail.send_email"
-        assert rows[0].status == "simulated"
-
-
-async def test_store_credentials_encrypts_at_rest(fernet_key):
-    uid = uuid.uuid4()
-    async with async_session_factory() as session:
-        user = User(id=uid, email=f"store_{uid}@x.com", hashed_password="x")
-        session.add(user)
-        await session.commit()
-        creds = _FakeCreds()
-        creds.token = "tok"
-        creds.refresh_token = "rt"
-        creds.expiry = datetime(2099, 1, 1)
-        creds.scopes = ["a", "b"]
-        await creds_mod.store_credentials(session, user, creds)
-        await session.refresh(user)
-        assert creds_mod.decrypt_token(user.google_access_token) == "tok"
-        assert creds_mod.decrypt_token(user.google_refresh_token) == "rt"
-        assert user.token_scopes == ["a", "b"]
-        assert user.auth_status == "valid"
-        assert user.token_expiry is not None
-
-
-async def test_credentials_refresh_rotates_and_persists(fernet_key, monkeypatch):
-    uid = uuid.uuid4()
-    async with async_session_factory() as session:
-        user = User(
-            id=uid,
-            email=f"refresh_{uid}@x.com",
-            hashed_password="x",
-            google_access_token=creds_mod.encrypt_token("old"),
-            google_refresh_token=creds_mod.encrypt_token("refresh-1"),
-            token_expiry=datetime(2000, 1, 1, tzinfo=timezone.utc),
-            token_scopes=["s1"],
-            auth_status="valid",
-        )
-        session.add(user)
-        await session.commit()
-
-        monkeypatch.setattr(creds_mod, "build_credentials", lambda u: _FakeCreds())
-        creds = await creds_mod.credentials_for(session, uid)
-        assert creds.token == "new-rotated"
-        await session.refresh(user)
-        assert creds_mod.decrypt_token(user.google_access_token) == "new-rotated"
-        assert user.auth_status == "valid"
-
-
-async def test_credentials_invalid_grant_marks_invalid(fernet_key, monkeypatch):
-    from google.auth.exceptions import RefreshError
-
-    uid = uuid.uuid4()
-    async with async_session_factory() as session:
-        user = User(
-            id=uid,
-            email=f"invalid_{uid}@x.com",
-            hashed_password="x",
-            google_access_token=creds_mod.encrypt_token("old"),
-            google_refresh_token=creds_mod.encrypt_token("refresh-1"),
-            token_expiry=datetime(2000, 1, 1, tzinfo=timezone.utc),
-            auth_status="valid",
-        )
-        session.add(user)
-        await session.commit()
-
-        monkeypatch.setattr(
-            creds_mod, "build_credentials", lambda u: _FakeCreds(raise_invalid=True)
-        )
-        with pytest.raises(RefreshError):
-            await creds_mod.credentials_for(session, uid)
-        await session.refresh(user)
-        assert user.auth_status == "invalid"

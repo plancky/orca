@@ -1,4 +1,3 @@
-import asyncio
 import logging
 import uuid
 
@@ -6,7 +5,7 @@ from sqlalchemy import select
 
 from backend.db.models import ActionsLog, ActionStatus, Task, TaskStatus
 from backend.db.session import async_session_factory
-from backend.workers.celery_app import app
+from backend.workers.celery_app import _run, app
 
 logger = logging.getLogger(__name__)
 
@@ -134,4 +133,4 @@ async def resume(
 @app.task(name="backend.workers.confirm.run_resume", bind=True)
 def run_resume(self, checkpoint_json: str, decision: str, task_id: str, user_id: str):
     logger.info(f"[resume] task_id={task_id} stage=celery_dispatch status=received")
-    return asyncio.run(resume(checkpoint_json, decision, task_id, user_id))
+    return _run(resume(checkpoint_json, decision, task_id, user_id))

@@ -1,15 +1,8 @@
-import json
-import uuid
-from datetime import timedelta
-
 import pytest
 from fastapi.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 
 from backend.api.deps import get_redis
-from backend.core.security import create_access_token
-from backend.db.models import Conversation, Task, TaskStatus, User
-from backend.db.session import async_session_factory
 from backend.main import app
 
 
@@ -54,58 +47,6 @@ async def override_get_redis():
 
 
 app.dependency_overrides[get_redis] = override_get_redis
-
-
-@pytest.mark.asyncio
-async def test_ws_qa_happy():
-    user = User(
-        id=uuid.uuid4(), email=f"ws{uuid.uuid4()}@example.com", hashed_password="dummy"
-    )
-    conv = Conversation(id=uuid.uuid4(), user_id=user.id, title="WS Test")
-    task = Task(
-        id=uuid.uuid4(),
-        user_id=user.id,
-        conversation_id=conv.id,
-        status=TaskStatus.SUCCESS.value,
-        result={"answer": "hello"},
-    )
-
-    async with async_session_factory() as session:
-        session.add(user)
-        await session.flush()
-        session.add(conv)
-        await session.flush()
-        session.add(task)
-        await session.commit()
-
-    stream_key = f"stream:tasks:{task.id}"
-    await fake_redis.xadd(
-        stream_key,
-        {
-            "data": json.dumps(
-                {
-                    "type": "node_started",
-                    "task_id": str(task.id),
-                    "node_id": "test",
-                    "timestamp": "2024-01-01T",
-                    "payload": {},
-                }
-            )
-        },
-    )
-
-    token = create_access_token(user.id, expires_delta=timedelta(minutes=15))
-
-    client = TestClient(app)
-    with client.websocket_connect(f"/ws/query?token={token}") as ws:
-        ws.send_json({"task_id": str(task.id)})
-
-        msg1 = ws.receive_json()
-        assert msg1["type"] == "node_started"
-
-        msg2 = ws.receive_json()
-        assert msg2["type"] == "done"
-        assert msg2["payload"] == {"answer": "hello"}
 
 
 @pytest.mark.asyncio

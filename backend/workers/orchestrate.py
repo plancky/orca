@@ -1,10 +1,9 @@
-import asyncio
 import logging
 import uuid
 
 from backend.db.models import Task, TaskStatus
 from backend.db.session import async_session_factory
-from backend.workers.celery_app import app
+from backend.workers.celery_app import _run, app
 
 logger = logging.getLogger(__name__)
 
@@ -129,4 +128,4 @@ def run_pipeline(
 ):
     """Sync Celery shell — wraps async pipeline."""
     logger.info(f"[pipeline] task_id={task_id} stage=celery_dispatch status=received")
-    return asyncio.run(pipeline(task_id, user_id, query, conversation_id, confirm))
+    return _run(pipeline(task_id, user_id, query, conversation_id, confirm))

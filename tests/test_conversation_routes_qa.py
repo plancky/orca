@@ -3,6 +3,7 @@ from datetime import timedelta
 
 import pytest
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import select
 
 from backend.core.security import create_access_token
 from backend.db.models import Conversation, Message, User
@@ -124,6 +125,97 @@ async def test_list_conversations_unauth_401():
         transport=ASGITransport(app=app), base_url="http://test"
     ) as client:
         resp = await client.get("/api/v1/conversations")
+        assert resp.status_code == 401
+
+    from backend.db.session import engine
+
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_delete_conversation_cascades_messages(seeded):
+    user, conv = seeded
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        resp = await client.delete(
+            f"/api/v1/conversations/{conv.id}", headers=_auth(user)
+        )
+        assert resp.status_code == 204
+
+        resp = await client.get(
+            f"/api/v1/conversations/{conv.id}", headers=_auth(user)
+        )
+        assert resp.status_code == 404
+
+    async with async_session_factory() as session:
+        remaining = (
+            (
+                await session.execute(
+                    select(Message).where(Message.conversation_id == conv.id)
+                )
+            )
+            .scalars()
+            .all()
+        )
+        assert remaining == []
+
+    from backend.db.session import engine
+
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_delete_conversation_not_owned_404(seeded):
+    _user, conv = seeded
+    async with async_session_factory() as session:
+        other = User(
+            email=f"other_{uuid.uuid4().hex}@example.com", hashed_password="pw"
+        )
+        session.add(other)
+        await session.commit()
+        await session.refresh(other)
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        resp = await client.delete(
+            f"/api/v1/conversations/{conv.id}", headers=_auth(other)
+        )
+        assert resp.status_code == 404
+
+    async with async_session_factory() as session:
+        still_there = await session.get(Conversation, conv.id)
+        assert still_there is not None
+
+    from backend.db.session import engine
+
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_delete_conversation_missing_404(seeded):
+    user, _conv = seeded
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        resp = await client.delete(
+            f"/api/v1/conversations/{uuid.uuid4()}", headers=_auth(user)
+        )
+        assert resp.status_code == 404
+
+    from backend.db.session import engine
+
+    await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_delete_conversation_unauth_401(seeded):
+    _user, conv = seeded
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        resp = await client.delete(f"/api/v1/conversations/{conv.id}")
         assert resp.status_code == 401
 
     from backend.db.session import engine

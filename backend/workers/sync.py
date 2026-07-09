@@ -28,7 +28,7 @@ from backend.providers.mock.seed_corpus import (
     _replace_chunks,
     _upsert_datasource,
 )
-from backend.workers.celery_app import app
+from backend.workers.celery_app import _run, app
 
 _SERVICES = (
     ("gmail", GmailDatasource, GmailChunk, "email_id"),
@@ -186,7 +186,7 @@ def sync_user(user_id: str) -> dict:
 
     A no-op unless ``PROVIDER=="google"`` — see ``sync_all_async``.
     """
-    return asyncio.run(sync_all_async(user_id))
+    return _run(sync_all_async(user_id))
 
 
 @app.task(name="backend.workers.sync.sync_all_users")
@@ -210,4 +210,4 @@ def sync_all_users():
             except Exception as exc:
                 print(f"[sync] user {uid} sync failed: {exc}")
 
-    asyncio.run(_sync_active())
+    _run(_sync_active())

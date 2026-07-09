@@ -1,7 +1,7 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "Orca",
+    "title": "Agentic Google Workspace Orchestrator",
     "description": "Classifies intent, plans a DAG, fans out to Gmail/GCal/Drive agents, hybrid pgvector search, synthesizes answers.",
     "contact": {
       "name": "Support"
@@ -603,6 +603,46 @@
                 }
               }
             }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Delete Conversation",
+        "description": "Delete a conversation (404 if missing or not owned).\n\n``Message.conversation_id`` and ``Task.conversation_id`` both FK here with\n``ondelete=\"CASCADE\"`` (see ``backend/db/models.py``), so the database\nremoves the conversation's messages/tasks; no manual cleanup needed.",
+        "operationId": "delete_conversation_api_v1_conversations__conversation_id__delete",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Conversation Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
           },
           "422": {
             "description": "Validation Error",
