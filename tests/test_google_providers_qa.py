@@ -199,6 +199,37 @@ async def test_google_search_uses_canonical_service(monkeypatch):
     assert result == []
 
 
+async def test_google_search_blank_query_skips_embedding(monkeypatch):
+    # Given: a date-only ask ("meetings last week") arrives with no query text.
+    captured: dict = {}
+
+    async def _fake_filter(session, service, user_id, filters=None, top_k=10):
+        captured["service"] = service
+        captured["filters"] = filters
+        return [{"event_id": "e1"}]
+
+    async def _boom_embed(text, user_id=None):
+        raise AssertionError("blank query must not be embedded")
+
+    monkeypatch.setattr(
+        "backend.providers.google.provider.filter_search", _fake_filter
+    )
+    monkeypatch.setattr(
+        "backend.providers.google.provider.embedder.embed_query", _boom_embed
+    )
+    window = {"start_at": {"start": "2026-07-01T00:00:00+00:00"}}
+
+    # When: search runs with an empty query but a start_at filter.
+    provider = GoogleProvider(session=object(), user_id=uuid.uuid4())
+    result = await provider.search("calendar", "", {"start_at": window["start_at"]})
+
+    # Then: it routes to the filter-only path (no embedding) with the canonical
+    # service and the metadata preserved.
+    assert captured["service"] == "gcal"
+    assert captured["filters"] == {"start_at": window["start_at"]}
+    assert result == [{"event_id": "e1"}]
+
+
 async def test_execute_dry_run_is_simulated(fernet_key, monkeypatch):
     monkeypatch.setattr(settings, "PROVIDER", "google")
     monkeypatch.setattr(settings, "DRY_RUN_WRITES", True)

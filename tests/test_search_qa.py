@@ -24,7 +24,7 @@ from sqlalchemy import text
 
 from backend.db.models import GmailDatasource, User
 from backend.db.session import async_session_factory
-from backend.embeddings.search import hybrid_search
+from backend.embeddings.search import filter_search, hybrid_search
 from backend.testing.fakes import FakeEmbedder
 
 # All datasources share one received_at so recency decay is uniform and cannot
@@ -169,4 +169,55 @@ async def test_hybrid_search_isolates_by_user(seeded_gmail):
     results = await hybrid_search(session, query, "gmail", str(other_id))
 
     # Then: none of the owner's items leak — user isolation holds.
+    assert results == []
+
+
+async def test_filter_search_returns_parents_without_embedding(seeded_gmail):
+    # Given: an owner whose 3 datasources were all received on 2024-03-01.
+    session, owner_id, _ = seeded_gmail
+    window = {
+        "received_at": {
+            "start": datetime(2024, 2, 1, tzinfo=timezone.utc).isoformat(),
+            "end": datetime(2024, 4, 1, tzinfo=timezone.utc).isoformat(),
+        }
+    }
+
+    # When: a filter-only search runs (ISO-string range, no query embedding).
+    results = await filter_search(session, "gmail", str(owner_id), filters=window)
+
+    # Then: one row per owned datasource, user-scoped, with no cosine ranking.
+    assert len(results) == 3
+    ids = [item["datasource_id"] for item in results]
+    assert len(ids) == len(set(ids))
+    assert all(item["user_id"] == owner_id for item in results)
+    assert all(item["distance"] is None for item in results)
+    assert all(item["similarity"] is None for item in results)
+    assert all("score" in item for item in results)
+
+
+async def test_filter_search_honors_the_date_window(seeded_gmail):
+    # Given: every seeded datasource sits on 2024-03-01.
+    session, owner_id, _ = seeded_gmail
+    window = {
+        "received_at": {
+            "start": datetime(2025, 1, 1, tzinfo=timezone.utc).isoformat(),
+            "end": datetime(2025, 2, 1, tzinfo=timezone.utc).isoformat(),
+        }
+    }
+
+    # When: the window excludes all of them.
+    results = await filter_search(session, "gmail", str(owner_id), filters=window)
+
+    # Then: nothing matches.
+    assert results == []
+
+
+async def test_filter_search_isolates_by_user(seeded_gmail):
+    # Given: a different user owns none of the seeded rows.
+    session, _, other_id = seeded_gmail
+
+    # When: they run an unfiltered filter search.
+    results = await filter_search(session, "gmail", str(other_id))
+
+    # Then: user scope holds — no leakage.
     assert results == []
