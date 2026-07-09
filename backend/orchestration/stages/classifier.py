@@ -1,5 +1,6 @@
 import hashlib
 import json
+import logging
 from datetime import datetime
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -13,6 +14,8 @@ from backend.llm.json_utils import extract_and_validate
 from backend.llm.prompts.classifier import CLASSIFIER_PROMPT
 from backend.orchestration.models.intent import Intent
 from backend.orchestration.utils.temporal import resolve_timeframe
+
+logger = logging.getLogger(__name__)
 
 
 def _get_redis() -> redis.Redis:
@@ -33,6 +36,8 @@ async def classify(
     if tz is None:
         tz = ZoneInfo("UTC")
 
+    log_ctx = f"[classify] user_id={user_id}"
+
     if context is None and user_id is not None and conversation_id is not None:
         context = await get_conversation_context(user_id, conversation_id, session)
     if context is None:
@@ -48,9 +53,13 @@ async def classify(
         try:
             cached = await redis_client.get(cache_key)
             if cached:
+                logger.info(f"{log_ctx} stage=classify status=cache_hit")
                 return Intent.model_validate_json(cached)
-        except (redis.RedisError, OSError):
+        except (redis.RedisError, OSError) as e:
+            logger.warning(f"{log_ctx} stage=classify status=cache_error error={e}")
             pass  # degrade gracefully if Redis is down
+
+    logger.info(f"{log_ctx} stage=classify status=cache_miss llm_call=started")
 
     prompt = CLASSIFIER_PROMPT.format(
         current_datetime=now.isoformat(),
@@ -68,9 +77,14 @@ async def classify(
     intent = await extract_and_validate(
         raw_response, Intent, llm_client=llm_client, schema_name="Intent"
     )
+    logger.info(
+        f"{log_ctx} stage=classify status=llm_call_finished "
+        f"intent={intent.intent} services={intent.services}"
+    )
 
     # Needs clarification short-circuit check
     if intent.needs_clarification:
+        logger.info(f"{log_ctx} stage=classify status=needs_clarification")
         return intent
 
     phrase = intent.entities.get("timeframe_phrase")
@@ -78,11 +92,18 @@ async def classify(
         timeframe = resolve_timeframe(phrase, now, tz)
         if timeframe:
             intent.entities["timeframe"] = timeframe
+            logger.info(
+                f"{log_ctx} stage=classify status=timeframe_resolved phrase={phrase!r}"
+            )
 
     if user_id and cache_key:
         try:
             await redis_client.setex(cache_key, 3600, intent.model_dump_json())
-        except (redis.RedisError, OSError):
+        except (redis.RedisError, OSError) as e:
+            logger.warning(
+                f"{log_ctx} stage=classify status=cache_write_error error={e}"
+            )
             pass
 
+    logger.info(f"{log_ctx} stage=classify status=finished")
     return intent

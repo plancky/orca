@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 import uuid
 from datetime import datetime, timezone
 from typing import Any
@@ -30,6 +31,8 @@ from backend.orchestration.models.results import (
 )
 from backend.orchestration.utils.checkpoint import Checkpoint
 from backend.orchestration.utils.tools import get_tool
+
+logger = logging.getLogger(__name__)
 
 
 def _utcnow() -> datetime:
@@ -141,6 +144,8 @@ async def execute(
     in_degrees = {n.id: len(n.depends_on) for n in plan.nodes}
     layers = []
 
+    log_ctx = f"[execute] task_id={task_id}"
+
     # Simple topo sort into layers
     queue = [nid for nid, deg in in_degrees.items() if deg == 0]
     while queue:
@@ -153,6 +158,12 @@ async def execute(
                     if in_degrees[nid] == 0:
                         next_queue.append(nid)
         queue = next_queue
+
+    logger.info(
+        f"{log_ctx} stage=execute status=dag_planned "
+        f"node_count={len(plan.nodes)} layer_count={len(layers)}"
+        + (" resumed=true" if resume_from else "")
+    )
 
     # Initialize state
     node_outputs = {}
@@ -168,14 +179,25 @@ async def execute(
         try:
             resolved_args = await _resolve_args(node, node_outputs)
         except DeferredArgResolutionError as e:
+            logger.warning(
+                f"{log_ctx} stage=execute node_id={node.id} tool={node.tool} "
+                f"status=arg_resolution_failed error={e} optional={node.optional}"
+            )
             if node.optional:
                 return {"_error": str(e), "status": "skipped"}
             raise e
 
         if node.tool in WRITE_TOOLS:
             # We must suspend
+            logger.info(
+                f"{log_ctx} stage=execute node_id={node.id} tool={node.tool} "
+                f"status=write_gate_hit"
+            )
             return {"_suspend": True, "node": node, "args": resolved_args}
 
+        logger.info(
+            f"{log_ctx} stage=execute node_id={node.id} tool={node.tool} status=started"
+        )
         await _publish_progress(
             task_id,
             NodeStartedEvent(
@@ -205,13 +227,21 @@ async def execute(
                 session,
                 db_lock,
             )
+            logger.info(
+                f"{log_ctx} stage=execute node_id={node.id} tool={node.tool} "
+                f"status=finished"
+            )
             return res
         except Exception as e:
+            logger.warning(
+                f"{log_ctx} stage=execute node_id={node.id} tool={node.tool} "
+                f"status=error error={e} optional={node.optional}"
+            )
             if node.optional:
                 return {"_error": str(e), "status": "skipped"}
             raise e
 
-    for layer in layers:
+    for layer_idx, layer in enumerate(layers):
         tasks = []
         for nid in layer:
             if nid in node_outputs:
@@ -221,16 +251,30 @@ async def execute(
         if not tasks:
             continue
 
+        logger.info(
+            f"{log_ctx} stage=execute status=layer_started "
+            f"layer={layer_idx + 1}/{len(layers)} node_ids={[t[0] for t in tasks]}"
+        )
+
         results = await asyncio.gather(*(t[1] for t in tasks), return_exceptions=True)
 
         for (nid, _), res in zip(tasks, results):
             if isinstance(res, Exception):
+                logger.error(
+                    f"{log_ctx} stage=execute status=layer_failed "
+                    f"node_id={nid} error={res}"
+                )
                 raise res
 
             if isinstance(res, dict) and res.get("_suspend"):
                 # We need to suspend here.
                 node = res["node"]
                 resolved_args = res["args"]
+
+                logger.info(
+                    f"{log_ctx} stage=execute status=suspending "
+                    f"node_id={node.id} tool={node.tool}"
+                )
 
                 # Determine remaining nodes
                 all_ids = list(node_by_id.keys())
@@ -295,8 +339,15 @@ async def execute(
                     session,
                     db_lock,
                 )
+                logger.info(
+                    f"{log_ctx} stage=execute status=suspended "
+                    f"action_id={action_log.id} remaining={len(remaining)}"
+                )
                 return cp
 
             node_outputs[nid] = res
 
+    logger.info(
+        f"{log_ctx} stage=execute status=finished node_count={len(node_outputs)}"
+    )
     return node_outputs

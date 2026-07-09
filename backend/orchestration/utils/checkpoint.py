@@ -1,3 +1,4 @@
+import logging
 import uuid
 from typing import Any
 
@@ -5,6 +6,8 @@ from pydantic import BaseModel
 
 from backend.orchestration.models.dag import Plan
 from backend.orchestration.models.intent import Intent
+
+logger = logging.getLogger(__name__)
 
 
 class Checkpoint(BaseModel):
@@ -30,13 +33,26 @@ async def get_checkpoint_for_action(
     """Return the checkpoint from the parent task of an actions_log entry."""
     from backend.db.models import ActionsLog, Task
 
+    log_ctx = f"[checkpoint] action_id={action_id}"
+
     log_row = await session.get(ActionsLog, action_id)
     if not log_row or not log_row.task_id:
+        logger.warning(
+            f"{log_ctx} stage=checkpoint_lookup status=action_or_task_missing"
+        )
         return None
 
     task_row = await session.get(Task, log_row.task_id)
     if not task_row or not task_row.checkpoint:
+        logger.warning(
+            f"{log_ctx} stage=checkpoint_lookup task_id={log_row.task_id} "
+            f"status=no_checkpoint"
+        )
         return None
+
+    logger.info(
+        f"{log_ctx} stage=checkpoint_lookup task_id={log_row.task_id} status=found"
+    )
 
     # Handle both string (JSON) and dict (JSONB parsed by SQLAlchemy)
     if isinstance(task_row.checkpoint, str):
